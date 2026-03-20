@@ -12,6 +12,6 @@
   },
   "peerDependencies": {
     "openclaw": "*",
-    "@clawdi-ai/knowledge-work-router": ">=0.1.0"
+    "@clawdi-ai/knowledge-work-router": "workspace:>=0.1.0"
   }
 }

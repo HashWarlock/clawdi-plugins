@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "references": [
+    { "path": "packages/router" },
+    { "path": "packages/pack-sales" },
+    { "path": "packages/pack-productivity" },
+    { "path": "packages/pack-recruiting" },
+    { "path": "packages/pack-marketing" },
+    { "path": "packages/pack-operations" },
+    { "path": "packages/pack-customer-support" },
+    { "path": "packages/pack-engineering" },
+    { "path": "packages/pack-enterprise-search" },
+    { "path": "packages/pack-human-resources" },
+    { "path": "packages/pack-product-management" }
+  ]
+}
