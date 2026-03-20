@@ -1,0 +1,71 @@
+{
+  "id": "@clawdi-ai/knowledge-work-router",
+  "name": "Knowledge Work Router",
+  "description": "Capability router for knowledge-work packs. Resolves capabilities through adapters (Composio, native tools, Lobster, CLI, MCPorter) with automatic fallback and onboarding.",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "adapterOrder": {
+        "type": "array",
+        "items": { "type": "string", "enum": ["composio", "openclaw_tool", "lobster", "cli", "mcporter"] },
+        "default": ["composio", "openclaw_tool", "lobster", "cli", "mcporter"],
+        "description": "Global adapter fallback order"
+      },
+      "disabledAdapters": {
+        "type": "array",
+        "items": { "type": "string" },
+        "default": [],
+        "description": "Adapters to disable globally"
+      },
+      "capabilityPins": {
+        "type": "object",
+        "additionalProperties": { "type": "string" },
+        "default": {},
+        "description": "Pin capabilities to specific adapters (e.g. crm.*: composio)"
+      },
+      "appLabels": {
+        "type": "object",
+        "additionalProperties": { "type": "string" },
+        "default": {},
+        "description": "Override user-facing app names"
+      },
+      "sideEffectPolicy": {
+        "type": "string",
+        "enum": ["always_confirm", "confirm_destructive", "never_confirm"],
+        "default": "confirm_destructive",
+        "description": "When to require confirmation before side-effecting actions"
+      },
+      "executionTimeoutMs": {
+        "type": "number",
+        "default": 30000,
+        "description": "Timeout for adapter execution in milliseconds"
+      },
+      "composio": {
+        "type": "object",
+        "properties": {
+          "apiKey": { "type": "string" },
+          "preferGooglesuper": { "type": "boolean", "default": true }
+        }
+      },
+      "mcporter": {
+        "type": "object",
+        "properties": {
+          "allowedServers": { "type": "array", "items": { "type": "string" }, "default": [] }
+        }
+      },
+      "cli": {
+        "type": "object",
+        "properties": {
+          "allowedBinaries": { "type": "array", "items": { "type": "string" }, "default": [] }
+        }
+      }
+    }
+  },
+  "uiHints": {
+    "adapterOrder": { "label": "Adapter Fallback Order" },
+    "disabledAdapters": { "label": "Disabled Adapters" },
+    "sideEffectPolicy": { "label": "Side-Effect Confirmation Policy" },
+    "composio.apiKey": { "label": "Composio API Key", "sensitive": true }
+  }
+}
