@@ -1,0 +1,8 @@
+{
+  "id": "@clawdi-ai/pack-sales",
+  "name": "Sales Pack",
+  "description": "AI-powered sales workflows: account research, call prep, competitive intel, pipeline review, forecasting, and outreach",
+  "version": "0.1.0",
+  "skills": ["./skills"],
+  "configSchema": {}
+}

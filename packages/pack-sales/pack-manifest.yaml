@@ -1,0 +1,39 @@
+packId: sales
+displayName: "Sales Pack"
+capabilities:
+  required:
+    - calendar.read_events
+    - calendar.prepare_meeting_context
+    - crm.lookup_account
+    - crm.create_note
+    - mail.send_followup
+    - research.web_search
+  optional:
+    - docs.create_brief
+    - research.collect_sources
+    - chat.search_messages
+    - enrichment.lookup_company
+    - enrichment.lookup_person
+preferredApps:
+  calendar.*:
+    - google_workspace
+    - outlook
+  crm.*:
+    - salesforce
+    - hubspot
+  mail.*:
+    - google_workspace
+    - outlook
+fallbackOverrides:
+  crm.lookup_account:
+    adapters: [composio, openclaw_tool, lobster, mcporter]
+preferences:
+  preferredCrm:
+    type: enum
+    values: [salesforce, hubspot, pipedrive]
+    label: "Primary CRM"
+    description: "Which CRM should be used for account lookups and note creation?"
+    captureAt: first_use
+onboarding:
+  welcomeMessage: "The Sales pack helps you prep for calls, research accounts, manage your pipeline, and draft personalized outreach."
+  suggestedFirstTask: "Try: 'Prep me for my next meeting'"

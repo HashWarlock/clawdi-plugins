@@ -89,6 +89,15 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@25.5.0)(jiti@2.6.1)(yaml@2.8.2)
 
+  packages/pack-sales:
+    dependencies:
+      '@clawdi-ai/knowledge-work-router':
+        specifier: workspace:>=0.1.0
+        version: link:../router
+      openclaw:
+        specifier: '*'
+        version: 2026.3.13(@napi-rs/canvas@0.1.97)(@types/express@5.0.6)
+
   packages/router:
     dependencies:
       openclaw:

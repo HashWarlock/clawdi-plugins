@@ -1,0 +1,17 @@
+{
+  "name": "@clawdi-ai/pack-sales",
+  "version": "0.1.0",
+  "description": "Sales knowledge-work pack: account research, call prep, pipeline management, and more",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "openclaw": {
+    "extensions": ["./dist/index.js"]
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "peerDependencies": {
+    "openclaw": "*",
+    "@clawdi-ai/knowledge-work-router": "workspace:>=0.1.0"
+  }
+}
