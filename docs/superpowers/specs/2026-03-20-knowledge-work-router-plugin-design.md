@@ -201,10 +201,19 @@ preferredApps:
 fallbackOverrides:
   crm.lookup_account:
     adapters: [composio, openclaw_tool, lobster, mcporter]
+preferences:
+  preferredCrm:
+    type: enum
+    values: [salesforce, hubspot, pipedrive]
+    label: "Primary CRM"
+    description: "Which CRM should be used for account lookups and note creation?"
+    captureAt: first_use
 onboarding:
   welcomeMessage: "The Sales pack helps you prep for calls, research accounts, and manage your pipeline."
   suggestedFirstTask: "Try: 'Prep me for my next meeting'"
 ```
+
+The `preferences` block defines user choices that affect routing. The router reads these from the manifest, presents them to the user during onboarding or at first use (`captureAt: first_use`), and stores the user's selections in the router's own config under `packPreferences.<packId>`. This keeps all runtime state in one place without cross-plugin config dependencies.
 
 ### Pack Plugin Manifest
 
@@ -215,26 +224,13 @@ onboarding:
   "description": "AI-powered sales workflows: account research, call prep, pipeline review, and more",
   "version": "1.0.0",
   "skills": ["./skills"],
-  "configSchema": {
-    "type": "object",
-    "properties": {
-      "preferredCrm": {
-        "type": "string",
-        "enum": ["salesforce", "hubspot", "pipedrive"],
-        "description": "Your primary CRM platform"
-      },
-      "approvalMode": {
-        "type": "string",
-        "enum": ["always", "side_effects_only", "never"],
-        "default": "side_effects_only"
-      }
-    }
-  },
-  "uiHints": {
-    "preferredCrm": { "label": "Primary CRM" },
-    "approvalMode": { "label": "Require approval before actions" }
-  }
+  "configSchema": {}
 }
+```
+
+Pack plugins have an empty `configSchema`. All user-facing preferences that affect routing live in `pack-manifest.yaml`, which the router reads at discovery time. This avoids the cross-plugin config problem — the router does not need to read another plugin's config; it reads the pack's manifest file directly from `installPath`.
+
+Side-effect policy is owned exclusively by the router's `sideEffectPolicy` config. Packs do not define their own approval mode.
 ```
 
 ### Pack Registration Code
@@ -299,12 +295,19 @@ interface AdapterReadiness {
   missingBins?: string[];
   missingEnv?: string[];
   missingConnections?: string[];
+  suggestedApps?: string[];  // user-facing app labels this adapter could satisfy
   setupAction?: "connect" | "install" | "configure" | "none";
 }
 
 interface AdapterResult {
   status: "ok" | "needs_setup" | "blocked" | "error";
   data?: unknown;
+  artifacts?: Array<{
+    kind: "file" | "link" | "text" | "structured";
+    name?: string;
+    mimeType?: string;
+    value?: unknown;
+  }>;
   notes?: string[];
 }
 
@@ -358,11 +361,13 @@ async resolve(capabilityId, packId, args) {
 }
 ```
 
-Fallback stops when:
-- A ready adapter is found
-- A side-effect requires confirmation
-- A policy forbids the next adapter
-- A capability is pinned to a specific adapter
+The fallback loop shown above handles the happy path. Additional logic applied outside the loop:
+
+- **Side-effect confirmation:** After a ready adapter is found but before execution, the router checks the side-effect policy. If confirmation is required, the router returns `blocked` without executing. See the Side-Effect Confirmation section.
+- **Capability pins:** Before entering the loop, the router checks `capabilityPins` config. If the capability is pinned, only that adapter is tried.
+- **Disabled adapters:** Adapters in `disabledAdapters` are filtered from the chain before the loop.
+- **Execution errors:** If `execute()` throws or returns `status: "error"`, the router does NOT try the next adapter. It surfaces the error immediately. Silent fallback on errors would mask broken adapters.
+- **Timeouts:** Each adapter `execute()` call is wrapped in a 30-second timeout. On timeout, the router returns `status: "error"` with a timeout note. Timeout duration is configurable via router config.
 
 ## Onboarding
 
@@ -522,25 +527,74 @@ All customization flows through the router's config schema. Pack skills and mani
 | Restrict local binaries | `cli.allowedBinaries: ["pandoc", "jq"]` |
 | Always confirm side effects | `sideEffectPolicy: "always_confirm"` |
 
+### Pattern Matching for Capability Keys
+
+Both `capabilityPins` in router config and `preferredApps` / `fallbackOverrides` in pack manifests support prefix-glob patterns using `*`. Matching rules:
+
+- `crm.*` matches `crm.lookup_account`, `crm.create_note`, etc.
+- `calendar.read_events` matches only that exact capability
+- More specific patterns take precedence over broader ones
+- Exact matches always win over globs
+
+The router implements this as simple prefix matching: strip the trailing `*`, check if the capability ID starts with the prefix.
+
 ### Side-Effect Confirmation
 
-When the router resolves a write capability, it checks the side-effect policy:
+Capabilities are classified as read or write via a `sideEffect` flag in the capability registry:
 
 ```ts
-if (isWriteCapability(capabilityId) && config.sideEffectPolicy !== "never_confirm") {
+interface CapabilityEntry {
+  id: CapabilityId;
+  sideEffect: boolean;  // true for write operations (crm.create_note, mail.send_followup)
+  adapters: AdapterId[];
+}
+```
+
+When the router resolves a write capability, it checks the side-effect policy before executing:
+
+```ts
+const entry = registry.get(capabilityId);
+if (entry.sideEffect && config.sideEffectPolicy !== "never_confirm") {
+  const token = crypto.randomUUID();
+  pendingConfirmations.set(token, { capabilityId, packId, args, adapterId, expiresAt: Date.now() + 300_000 });
   return {
     status: "blocked",
     data: {
       message: `About to create a note in ${resolvedApp}. Proceed?`,
-      capability: capabilityId,
-      adapter: adapter.id,
-      awaitingConfirmation: true
+      confirmationToken: token
     }
   };
 }
 ```
 
-The LLM presents the confirmation. On approval, the skill re-invokes with a confirmation token.
+The `capability_execute` tool accepts an optional `confirmationToken` parameter:
+
+```ts
+api.registerTool({
+  name: "capability_execute",
+  parameters: {
+    capabilityId: { type: "string" },
+    packId: { type: "string" },
+    args: { type: "object" },
+    confirmationToken: { type: "string", description: "Token from a prior blocked result, provided after user approval" }
+  },
+  handler: async ({ capabilityId, packId, args, confirmationToken }) => {
+    if (confirmationToken) {
+      return router.executeConfirmed(confirmationToken);
+    }
+    return router.resolve(capabilityId, packId, args);
+  }
+});
+```
+
+**Round-trip protocol:**
+1. Skill calls `capability_execute` with a write capability
+2. Router returns `status: "blocked"` with a `confirmationToken` and human-readable message
+3. LLM presents the message to the user and asks for approval
+4. User approves
+5. LLM re-calls `capability_execute` with the same `capabilityId` plus the `confirmationToken`
+6. Router validates the token (exists, not expired, matches capability), executes, and removes the token
+7. Tokens expire after 5 minutes if unused
 
 ## Decisions Locked In
 
@@ -555,10 +609,16 @@ The LLM presents the confirmation. On approval, the skill re-invokes with a conf
 - All enterprise customization through router config, zero pack edits.
 - Side-effect confirmation is policy-driven and configurable.
 
+## Deferred to v2
+
+- **Agent adapter.** Agent delegation introduces significant complexity (isolated workspaces, cross-agent messaging policy, session spawning). Deferred until the five core adapters are stable. When added, the agent adapter should only serve capabilities explicitly marked `agentic_allowed`, use `sessions_spawn` (not `sessions_send`), and delegate to dedicated worker agents that return drafts rather than perform final side effects.
+- **Versioning strategy** for pack manifests and capability IDs. For v1, we treat the manifest schema and capability ID namespace as unstable. Versioning should be defined before the first breaking change.
+
 ## Open Questions for Implementation
 
 - What initial set of capability IDs should the registry define? (We need a canonical list.)
 - How should the Composio adapter discover available actions dynamically vs. using a static capability map?
 - Should the router cache adapter readiness state, or check fresh on every resolve?
 - What is the minimum Lobster workflow set for the sales pack?
-- How should pack config (e.g., `preferredCrm`) flow from the pack's config schema to the router's resolution logic?
+- Verify that `api.getEnabledPlugins()` returns objects with an `installPath` property (or equivalent) for reading `pack-manifest.yaml`. If not, identify an alternative mechanism for locating pack files at runtime.
+- Verify that `"skills": ["./skills"]` in the plugin manifest correctly resolves a directory of skill subdirectories. If OpenClaw expects individual skill paths, list them explicitly.
