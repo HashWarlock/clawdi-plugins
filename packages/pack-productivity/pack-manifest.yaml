@@ -1,0 +1,30 @@
+packId: productivity
+displayName: "Productivity Pack"
+capabilities:
+  required:
+    - calendar.read_events
+    - mail.read_inbox
+    - project.list_tasks
+  optional:
+    - chat.search_messages
+    - docs.search_files
+    - project.create_task
+    - research.web_search
+preferredApps:
+  calendar.*:
+    - google_workspace
+    - outlook
+  project.*:
+    - linear
+    - asana
+    - jira
+preferences:
+  preferredProjectTracker:
+    type: enum
+    values: [linear, asana, jira, todoist]
+    label: "Project Tracker"
+    description: "Where are your tasks tracked?"
+    captureAt: first_use
+onboarding:
+  welcomeMessage: "The Productivity pack helps you plan your day, prep for meetings, manage tasks, and run weekly reviews."
+  suggestedFirstTask: "Try: 'Plan my day' or 'What's on my plate?'"

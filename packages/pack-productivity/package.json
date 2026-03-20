@@ -1,0 +1,15 @@
+{
+  "name": "@clawdi-ai/pack-productivity",
+  "version": "0.1.0",
+  "description": "Productivity knowledge-work pack: daily planning, meeting prep, task management, and weekly reviews",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "openclaw": {
+    "extensions": ["./dist/index.js"]
+  },
+  "scripts": { "build": "tsc" },
+  "peerDependencies": {
+    "openclaw": "*",
+    "@clawdi-ai/knowledge-work-router": "workspace:>=0.1.0"
+  }
+}
