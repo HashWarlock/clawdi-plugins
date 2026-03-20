@@ -1,0 +1,29 @@
+packId: recruiting
+displayName: "Recruiting Pack"
+capabilities:
+  required:
+    - ats.search_candidates
+    - ats.get_candidate
+    - calendar.read_events
+    - research.web_search
+  optional:
+    - ats.update_candidate_stage
+    - mail.send_followup
+    - mail.read_inbox
+    - docs.create_brief
+    - recruiting.offer_workflow
+preferredApps:
+  ats.*:
+    - greenhouse
+    - lever
+    - ashby
+preferences:
+  preferredAts:
+    type: enum
+    values: [greenhouse, lever, ashby, workable]
+    label: "Applicant Tracking System"
+    description: "Which ATS do you use for recruiting?"
+    captureAt: first_use
+onboarding:
+  welcomeMessage: "The Recruiting pack helps with candidate pipelines, interview planning, org design, and offers."
+  suggestedFirstTask: "Try: 'Show me the recruiting pipeline' or 'Prep interview questions for [role]'"
