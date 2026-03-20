@@ -1,0 +1,24 @@
+{
+  "name": "@clawdi-ai/knowledge-work-router",
+  "version": "0.1.0",
+  "description": "Capability router for OpenClaw knowledge-work packs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "openclaw": {
+    "extensions": ["./dist/index.js"]
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "yaml": "^2.7.0"
+  },
+  "peerDependencies": {
+    "openclaw": "*"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  }
+}
