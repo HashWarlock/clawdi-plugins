@@ -1,0 +1,68 @@
+packId: product-management
+displayName: "Product Management Pack"
+capabilities:
+  required:
+    - project.list_tasks
+    - project.create_task
+    - docs.search_files
+    - docs.create_brief
+  optional:
+    - research.web_search
+    - analytics.get_metrics
+    - chat.search_messages
+    - calendar.read_events
+    - mail.read_inbox
+preferredApps:
+  project.*:
+    - linear
+    - jira
+    - asana
+    - shortcut
+  docs.*:
+    - notion
+    - google_workspace
+    - confluence
+  research.*:
+    - perplexity
+    - tavily
+    - brave_search
+  analytics.*:
+    - amplitude
+    - mixpanel
+    - posthog
+  chat.*:
+    - slack
+    - teams
+  calendar.*:
+    - google_workspace
+    - outlook
+  mail.*:
+    - google_workspace
+    - outlook
+preferences:
+  preferredProjectTool:
+    type: enum
+    values: [linear, jira, asana, shortcut]
+    label: "Primary Project Management Tool"
+    description: "Which tool does your team use for task and sprint management?"
+    captureAt: first_use
+  preferredDocsTool:
+    type: enum
+    values: [notion, google_workspace, confluence]
+    label: "Primary Documentation Platform"
+    description: "Where should specs and briefs be created?"
+    captureAt: first_use
+  sprintLengthDays:
+    type: enum
+    values: ["7", "14", "21"]
+    label: "Sprint Length"
+    description: "How long are your team's sprints?"
+    captureAt: first_use
+  productName:
+    type: string
+    label: "Product Name"
+    description: "The name of the product you manage, used in generated documents."
+    captureAt: onboarding
+onboarding:
+  welcomeMessage: "The Product Management pack helps you write specs, plan sprints, update roadmaps, review metrics, analyze competitors, brainstorm features, prepare stakeholder updates, and synthesize research."
+  suggestedFirstTask: "Try: 'Write a spec for a new feature' or 'Plan the next sprint'"

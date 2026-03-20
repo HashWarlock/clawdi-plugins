@@ -1,0 +1,8 @@
+{
+  "id": "@clawdi-ai/pack-marketing",
+  "name": "Marketing Pack",
+  "description": "AI-powered marketing workflows: brand review, campaign planning, competitive briefs, content creation, email sequences, SEO audits, and performance reporting",
+  "version": "0.1.0",
+  "skills": ["./skills"],
+  "configSchema": {}
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@clawdi-ai/pack-human-resources",
+  "version": "0.1.0",
+  "description": "Human resources operations pack: performance reviews, compensation analysis, people analytics, policy lookup, onboarding plans, handbook management, and exit interviews",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "openclaw": {
+    "extensions": ["./dist/index.js"]
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "openclaw": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

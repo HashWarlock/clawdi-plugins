@@ -1,0 +1,53 @@
+packId: customer-support
+displayName: "Customer Support Pack"
+capabilities:
+  required:
+    - mail.read_inbox
+    - crm.lookup_account
+    - project.create_task
+    - docs.search_files
+  optional:
+    - research.web_search
+    - mail.send_followup
+    - docs.create_brief
+    - chat.search_messages
+preferredApps:
+  mail.*:
+    - google_workspace
+    - outlook
+  crm.*:
+    - zendesk
+    - salesforce
+    - hubspot
+  project.*:
+    - linear
+    - jira
+    - asana
+  docs.*:
+    - notion
+    - google_workspace
+    - confluence
+  chat.*:
+    - slack
+    - teams
+preferences:
+  preferredTicketingSystem:
+    type: enum
+    values: [zendesk, freshdesk, intercom, jira_service_management]
+    label: "Primary Ticketing System"
+    description: "Which ticketing system should be used for ticket triage and escalation?"
+    captureAt: first_use
+  preferredKnowledgeBase:
+    type: enum
+    values: [notion, confluence, zendesk_guide, gitbook]
+    label: "Knowledge Base Platform"
+    description: "Where should new KB articles be published?"
+    captureAt: first_use
+  escalationChannel:
+    type: string
+    label: "Escalation Channel"
+    description: "Slack channel or Teams channel name for posting escalations"
+    captureAt: first_use
+onboarding:
+  welcomeMessage: "The Customer Support pack helps you triage tickets, research customer context, draft responses, manage escalations, and create knowledge base articles."
+  suggestedFirstTask: "Try: 'Triage my open support tickets'"

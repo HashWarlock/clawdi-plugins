@@ -1,0 +1,8 @@
+{
+  "id": "@clawdi-ai/pack-operations",
+  "name": "Operations Pack",
+  "description": "AI-powered operations workflows: capacity planning, change requests, compliance tracking, process documentation, optimization, risk assessment, runbooks, status reports, and vendor reviews",
+  "version": "0.1.0",
+  "skills": ["./skills"],
+  "configSchema": {}
+}

@@ -32,9 +32,16 @@ Every package is a native OpenClaw plugin. Packs are plugins, not compatible bun
 | Package | Type | Purpose |
 |---|---|---|
 | `@clawdi-ai/knowledge-work-router` | Native plugin | Capability resolution, adapter chain, onboarding, config |
-| `@clawdi-ai/pack-sales` | Native plugin | Sales skills + pack manifest |
-| `@clawdi-ai/pack-recruiting` | Native plugin | Recruiting skills + pack manifest |
-| `@clawdi-ai/pack-productivity` | Native plugin | Productivity skills + pack manifest |
+| `@clawdi-ai/pack-sales` | Native plugin | Sales workflows: account research, call prep, pipeline, outreach |
+| `@clawdi-ai/pack-productivity` | Native plugin | Daily planning, meeting prep, task management, weekly reviews |
+| `@clawdi-ai/pack-recruiting` | Native plugin | Recruiting pipeline, interview prep, org planning, offers |
+| `@clawdi-ai/pack-marketing` | Native plugin | Campaigns, SEO, content creation, email sequences, brand review |
+| `@clawdi-ai/pack-operations` | Native plugin | Status reports, runbooks, risk assessment, compliance, vendor review |
+| `@clawdi-ai/pack-customer-support` | Native plugin | Ticket triage, customer research, draft responses, KB articles |
+| `@clawdi-ai/pack-engineering` | Native plugin | Code review prep, incident response, architecture review, retros |
+| `@clawdi-ai/pack-enterprise-search` | Native plugin | Cross-source search, knowledge synthesis, digests |
+| `@clawdi-ai/pack-human-resources` | Native plugin | Performance reviews, comp analysis, people reports, policy, onboarding |
+| `@clawdi-ai/pack-product-management` | Native plugin | Specs, sprint planning, roadmaps, metrics, stakeholder updates |
 
 ### Discovery Convention
 

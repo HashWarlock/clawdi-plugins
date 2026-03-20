@@ -1,0 +1,8 @@
+{
+  "id": "@clawdi-ai/pack-human-resources",
+  "name": "Human Resources Pack",
+  "description": "HR operations workflows: performance reviews, compensation analysis, people analytics, policy lookup, onboarding plans, employee handbook, and exit interviews",
+  "version": "0.1.0",
+  "skills": ["./skills"],
+  "configSchema": {}
+}

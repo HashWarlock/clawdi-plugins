@@ -1,0 +1,21 @@
+{
+  "name": "@clawdi-ai/pack-enterprise-search",
+  "version": "0.1.0",
+  "description": "Enterprise search workflows: multi-source search, strategy planning, knowledge synthesis, and daily digests",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "openclaw": {
+    "extensions": ["./dist/index.js"]
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "openclaw": "*"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@clawdi-ai/pack-product-management",
+  "version": "0.1.0",
+  "description": "Product management workflows: spec writing, sprint planning, roadmap updates, metrics review, competitive analysis, brainstorming, stakeholder updates, and research synthesis",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "openclaw": {
+    "extensions": ["./dist/index.js"]
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "openclaw": "*"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  }
+}

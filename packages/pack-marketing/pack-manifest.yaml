@@ -1,0 +1,56 @@
+packId: marketing
+displayName: "Marketing Pack"
+capabilities:
+  required:
+    - research.web_search
+    - analytics.get_metrics
+    - seo.audit_page
+    - seo.keyword_research
+    - docs.create_brief
+  optional:
+    - mail.send_followup
+    - chat.search_messages
+    - enrichment.lookup_company
+preferredApps:
+  research.web_search:
+    - google_workspace
+    - bing
+  analytics.get_metrics:
+    - google_analytics
+    - hubspot
+  seo.audit_page:
+    - semrush
+    - ahrefs
+  seo.keyword_research:
+    - semrush
+    - ahrefs
+  docs.create_brief:
+    - google_workspace
+    - notion
+  mail.send_followup:
+    - google_workspace
+    - outlook
+  chat.search_messages:
+    - slack
+    - msteams
+fallbackOverrides:
+  analytics.get_metrics:
+    adapters: [composio, openclaw_tool, lobster, mcporter]
+  seo.audit_page:
+    adapters: [composio, openclaw_tool, lobster]
+preferences:
+  preferredAnalyticsPlatform:
+    type: enum
+    values: [google_analytics, hubspot, mixpanel]
+    label: "Primary Analytics Platform"
+    description: "Which analytics platform should be used for performance metrics and reporting?"
+    captureAt: first_use
+  preferredSeoTool:
+    type: enum
+    values: [semrush, ahrefs, moz]
+    label: "Primary SEO Tool"
+    description: "Which SEO tool should be used for audits and keyword research?"
+    captureAt: first_use
+onboarding:
+  welcomeMessage: "The Marketing pack helps you review brand consistency, plan campaigns, create content, audit SEO, build email sequences, and analyze performance."
+  suggestedFirstTask: "Try: 'Audit the SEO of our homepage'"

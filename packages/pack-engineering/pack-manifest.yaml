@@ -1,0 +1,55 @@
+packId: engineering
+displayName: "Engineering Pack"
+capabilities:
+  required:
+    - project.list_tasks
+    - project.create_task
+    - docs.search_files
+    - chat.search_messages
+  optional:
+    - research.web_search
+    - docs.create_brief
+    - calendar.read_events
+preferredApps:
+  project.*:
+    - linear
+    - jira
+    - github_projects
+    - asana
+  docs.*:
+    - notion
+    - confluence
+    - google_workspace
+  chat.*:
+    - slack
+    - teams
+  calendar.*:
+    - google_workspace
+    - outlook
+preferences:
+  preferredProjectTracker:
+    type: enum
+    values: [linear, jira, github_projects, asana]
+    label: "Primary Project Tracker"
+    description: "Which project management tool is used for sprint tasks and issue tracking?"
+    captureAt: first_use
+  preferredDocsPlatform:
+    type: enum
+    values: [notion, confluence, google_docs, markdown_repo]
+    label: "Documentation Platform"
+    description: "Where should generated documents and design docs be created?"
+    captureAt: first_use
+  sprintCadence:
+    type: enum
+    values: [one_week, two_weeks, three_weeks, four_weeks]
+    label: "Sprint Cadence"
+    description: "How long are your team's sprint cycles?"
+    captureAt: first_use
+  teamName:
+    type: string
+    label: "Team Name"
+    description: "Your engineering team or squad name for filtering tasks and channels"
+    captureAt: first_use
+onboarding:
+  welcomeMessage: "The Engineering pack helps you prepare code reviews, manage incidents, review architecture, run sprint retros, track tech debt, and generate documentation."
+  suggestedFirstTask: "Try: 'Prep a code review for the latest open PRs'"

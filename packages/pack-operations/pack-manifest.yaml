@@ -1,0 +1,60 @@
+packId: operations
+displayName: "Operations Pack"
+capabilities:
+  required:
+    - project.list_tasks
+    - project.create_task
+    - docs.create_brief
+    - docs.search_files
+    - research.web_search
+  optional:
+    - calendar.read_events
+    - chat.search_messages
+    - mail.send_followup
+preferredApps:
+  project.list_tasks:
+    - jira
+    - asana
+    - linear
+  project.create_task:
+    - jira
+    - asana
+    - linear
+  docs.create_brief:
+    - google_workspace
+    - notion
+    - confluence
+  docs.search_files:
+    - google_workspace
+    - notion
+    - confluence
+  calendar.read_events:
+    - google_workspace
+    - outlook
+  chat.search_messages:
+    - slack
+    - msteams
+  mail.send_followup:
+    - google_workspace
+    - outlook
+fallbackOverrides:
+  project.list_tasks:
+    adapters: [composio, openclaw_tool, lobster, mcporter]
+  docs.search_files:
+    adapters: [composio, openclaw_tool, lobster, mcporter]
+preferences:
+  preferredProjectTool:
+    type: enum
+    values: [jira, asana, linear, trello]
+    label: "Primary Project Management Tool"
+    description: "Which project management tool should be used for task tracking and planning?"
+    captureAt: first_use
+  preferredDocsTool:
+    type: enum
+    values: [google_workspace, notion, confluence]
+    label: "Primary Documentation Platform"
+    description: "Which documentation platform should be used for creating and searching documents?"
+    captureAt: first_use
+onboarding:
+  welcomeMessage: "The Operations pack helps you plan capacity, manage changes, track compliance, document processes, assess risk, maintain runbooks, generate status reports, and review vendors."
+  suggestedFirstTask: "Try: 'Generate a status report for this week'"

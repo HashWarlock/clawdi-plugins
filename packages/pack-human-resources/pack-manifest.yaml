@@ -1,0 +1,55 @@
+packId: human-resources
+displayName: "Human Resources Pack"
+capabilities:
+  required:
+    - hris.get_employee
+    - hris.list_employees
+    - docs.search_files
+    - docs.create_brief
+  optional:
+    - compensation.get_benchmarks
+    - research.web_search
+    - project.list_tasks
+    - calendar.read_events
+    - mail.send_followup
+preferredApps:
+  hris.*:
+    - bamboohr
+    - workday
+    - rippling
+  docs.*:
+    - google_workspace
+    - notion
+    - confluence
+  compensation.*:
+    - payscale
+    - levels_fyi
+  calendar.*:
+    - google_workspace
+    - outlook
+  mail.*:
+    - google_workspace
+    - outlook
+fallbackOverrides:
+  hris.get_employee:
+    adapters: [composio, openclaw_tool, lobster, mcporter]
+  hris.list_employees:
+    adapters: [composio, openclaw_tool, lobster, mcporter]
+  compensation.get_benchmarks:
+    adapters: [composio, openclaw_tool, cli, mcporter]
+preferences:
+  preferredHris:
+    type: enum
+    values: [bamboohr, workday, rippling, gusto, adp]
+    label: "Primary HRIS"
+    description: "Which HR information system should be used for employee data, org charts, and people analytics?"
+    captureAt: first_use
+  preferredDocsProvider:
+    type: enum
+    values: [google_workspace, notion, confluence, sharepoint]
+    label: "Policy Documents Source"
+    description: "Where are company policies and handbooks stored?"
+    captureAt: first_use
+onboarding:
+  welcomeMessage: "The Human Resources pack helps you run performance reviews, analyze compensation, generate people analytics, look up policies, create onboarding plans, manage handbooks, and structure exit interviews."
+  suggestedFirstTask: "Try: 'Look up our PTO policy' or 'Help me write a performance review'"

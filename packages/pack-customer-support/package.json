@@ -1,0 +1,21 @@
+{
+  "name": "@clawdi-ai/pack-customer-support",
+  "version": "0.1.0",
+  "description": "Customer support workflows: ticket triage, customer research, response drafting, escalation, and KB article creation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "openclaw": {
+    "extensions": ["./dist/index.js"]
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "openclaw": "*"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  }
+}

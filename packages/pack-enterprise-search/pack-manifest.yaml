@@ -1,0 +1,48 @@
+packId: enterprise-search
+displayName: "Enterprise Search Pack"
+capabilities:
+  required:
+    - research.web_search
+    - docs.search_files
+    - mail.read_inbox
+  optional:
+    - chat.search_messages
+    - docs.create_brief
+preferredApps:
+  research.*:
+    - perplexity
+    - tavily
+    - brave_search
+  docs.*:
+    - notion
+    - google_workspace
+    - confluence
+    - sharepoint
+  mail.*:
+    - google_workspace
+    - outlook
+  chat.*:
+    - slack
+    - teams
+preferences:
+  preferredSearchDepth:
+    type: enum
+    values: [quick, standard, deep]
+    label: "Default Search Depth"
+    description: "How thorough should searches be by default? Quick returns fast results, deep casts a wider net across all sources."
+    captureAt: first_use
+  preferredDocumentStore:
+    type: enum
+    values: [notion, google_workspace, confluence, sharepoint]
+    label: "Primary Document Store"
+    description: "Which platform holds most of your team's documents and knowledge base?"
+    captureAt: first_use
+  digestSchedule:
+    type: enum
+    values: [daily, twice_daily, weekly]
+    label: "Digest Frequency"
+    description: "How often should information digests be generated?"
+    captureAt: first_use
+onboarding:
+  welcomeMessage: "The Enterprise Search pack helps you search across all your work tools, plan research strategies, synthesize knowledge from multiple sources, and receive curated information digests."
+  suggestedFirstTask: "Try: 'Search for recent discussions about Q2 planning across all my tools'"
