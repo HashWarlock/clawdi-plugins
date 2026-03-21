@@ -1,7 +1,35 @@
 import { randomUUID } from "node:crypto";
-import type { CapabilityId, AdapterId, PendingConfirmation, PackId } from "../capabilities/types.js";
+import type {
+  CapabilityId,
+  AdapterId,
+  PendingConfirmation,
+  PackId,
+} from "../capabilities/types.js";
+import { extractVerb } from "../discovery/intent.js";
 
-export type SideEffectPolicy = "always_confirm" | "confirm_destructive" | "never_confirm";
+export type SideEffectPolicy =
+  | "always_confirm"
+  | "confirm_destructive"
+  | "never_confirm";
+
+const WRITE_VERBS = new Set([
+  "create",
+  "send",
+  "update",
+  "delete",
+  "write",
+  "post",
+  "remove",
+  "modify",
+  "archive",
+  "approve",
+  "reject",
+  "cancel",
+  "close",
+  "merge",
+  "assign",
+  "move",
+]);
 
 export interface SideEffectCheckResult {
   blocked: boolean;
@@ -22,21 +50,31 @@ export class SideEffectGuard {
     this.policy = policy;
   }
 
+  isSideEffect(
+    capabilityId: CapabilityId,
+    sideEffects?: CapabilityId[]
+  ): boolean {
+    if (sideEffects?.includes(capabilityId)) return true;
+    return WRITE_VERBS.has(extractVerb(capabilityId));
+  }
+
   check(input: {
     capabilityId: CapabilityId;
     packId: PackId;
     args: Record<string, unknown>;
-    isSideEffect: boolean;
     adapterId: AdapterId;
     resolvedApp: string;
+    sideEffects?: CapabilityId[];
   }): SideEffectCheckResult {
+    const isSE = this.isSideEffect(
+      input.capabilityId,
+      input.sideEffects
+    );
     const shouldBlock =
       this.policy === "always_confirm" ||
-      (this.policy === "confirm_destructive" && input.isSideEffect);
+      (this.policy === "confirm_destructive" && isSE);
 
-    if (!shouldBlock) {
-      return { blocked: false };
-    }
+    if (!shouldBlock) return { blocked: false };
 
     const token = randomUUID();
     this.pending.set(token, {
@@ -57,13 +95,11 @@ export class SideEffectGuard {
   validateToken(token: string): PendingConfirmation | undefined {
     const pending = this.pending.get(token);
     if (!pending) return undefined;
-
     if (Date.now() > pending.expiresAt) {
       this.pending.delete(token);
       return undefined;
     }
-
-    this.pending.delete(token); // consume token
+    this.pending.delete(token);
     return pending;
   }
 
@@ -74,9 +110,7 @@ export class SideEffectGuard {
   cleanupExpired(): void {
     const now = Date.now();
     for (const [token, pending] of this.pending) {
-      if (now > pending.expiresAt) {
-        this.pending.delete(token);
-      }
+      if (now > pending.expiresAt) this.pending.delete(token);
     }
   }
 }

@@ -1,69 +1,68 @@
-import type { CapabilityAdapter, AdapterReadiness, AdapterResult } from "./types.js";
-import type { CapabilityId, PackId } from "../capabilities/types.js";
-
-export interface LobsterClient {
-  workflowExists(workflowId: string): Promise<boolean>;
-  startWorkflow(workflowId: string, args: Record<string, unknown>): Promise<{ result: unknown }>;
-}
-
-const CAPABILITY_TO_WORKFLOW: Record<string, string> = {
-  "crm.create_note_workflow": "crm-note-with-approval",
-  "crm.update_deal_workflow": "crm-deal-update",
-  "mail.send_sequence": "email-sequence-workflow",
-  "docs.create_brief_workflow": "brief-from-research",
-  "recruiting.offer_workflow": "offer-approval-chain",
-};
+import type {
+  CapabilityAdapter,
+  ProbeResult,
+  ProbeHints,
+  AdapterResult,
+} from "./types.js";
 
 export class LobsterAdapter implements CapabilityAdapter {
   readonly id = "lobster";
-  private client: LobsterClient | null;
 
-  constructor(client?: LobsterClient) {
-    this.client = client ?? null;
+  constructor(
+    private listWorkflows: () => Promise<string[]>,
+    private runWorkflow: (
+      id: string,
+      args: Record<string, unknown>
+    ) => Promise<unknown>
+  ) {}
+
+  async probe(
+    capabilityId: string,
+    _intent: string,
+    hints?: ProbeHints
+  ): Promise<ProbeResult | null> {
+    const isWorkflow = capabilityId.endsWith("_workflow");
+    if (!isWorkflow && !hints?.pinned) return null;
+
+    const dotIndex = capabilityId.indexOf(".");
+    const suffix =
+      dotIndex === -1
+        ? capabilityId
+        : capabilityId.slice(dotIndex + 1);
+    const searchTerm = isWorkflow
+      ? suffix.replace(/_workflow$/, "").replace(/_/g, "-")
+      : suffix.replace(/_/g, "-");
+
+    const workflows = await this.listWorkflows();
+    const match = workflows.find((w) => w.includes(searchTerm));
+    if (!match) return null;
+
+    return {
+      adapterId: this.id,
+      providerDetails: { workflowId: match },
+      connectionReady: true,
+      displayName: match,
+    };
   }
 
-  setClient(client: LobsterClient): void {
-    this.client = client;
-  }
-
-  async providesCapabilities(): Promise<CapabilityId[]> {
-    return Object.keys(CAPABILITY_TO_WORKFLOW);
-  }
-
-  async checkReadiness(input: {
-    packId: PackId;
-    capabilityId: CapabilityId;
-  }): Promise<AdapterReadiness> {
-    const workflowId = CAPABILITY_TO_WORKFLOW[input.capabilityId];
-    if (!workflowId || !this.client) {
-      return { ready: false, setupAction: "configure" };
-    }
-
+  async execute(
+    _capabilityId: string,
+    providerDetails: unknown,
+    args: Record<string, unknown>,
+    _packId: string
+  ): Promise<AdapterResult> {
+    const { workflowId } = providerDetails as {
+      workflowId: string;
+    };
     try {
-      const exists = await this.client.workflowExists(workflowId);
-      return { ready: exists, setupAction: exists ? "none" : "configure" };
-    } catch {
-      return { ready: false, setupAction: "configure" };
-    }
-  }
-
-  async execute(input: {
-    packId: PackId;
-    capabilityId: CapabilityId;
-    args: Record<string, unknown>;
-  }): Promise<AdapterResult> {
-    const workflowId = CAPABILITY_TO_WORKFLOW[input.capabilityId];
-    if (!workflowId || !this.client) {
-      return { status: "error", notes: [`No Lobster workflow for ${input.capabilityId}`] };
-    }
-
-    try {
-      const run = await this.client.startWorkflow(workflowId, input.args);
-      return { status: "ok", data: run.result };
+      const data = await this.runWorkflow(workflowId, args);
+      return { status: "ok", data };
     } catch (err) {
       return {
         status: "error",
-        notes: [`Lobster workflow failed: ${err instanceof Error ? err.message : String(err)}`],
+        notes: [
+          `Lobster workflow failed: ${err instanceof Error ? err.message : String(err)}`,
+        ],
       };
     }
   }

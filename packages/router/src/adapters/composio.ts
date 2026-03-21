@@ -1,124 +1,128 @@
-import type { CapabilityAdapter, AdapterReadiness, AdapterResult } from "./types.js";
-import type { CapabilityId, PackId } from "../capabilities/types.js";
+import type {
+  CapabilityAdapter,
+  ProbeResult,
+  ProbeHints,
+  AdapterResult,
+} from "./types.js";
 
-interface ComposioMapping {
-  toolkit: string;
-  action: string;
+export type McpCallFn = (
+  server: string,
+  tool: string,
+  args: Record<string, unknown>
+) => Promise<unknown>;
+
+function toolkitDisplayName(toolkit: string): string {
+  const overrides: Record<string, string> = {
+    googlesuper: "Google Workspace",
+    hubspot: "HubSpot",
+    bamboohr: "BambooHR",
+  };
+  return (
+    overrides[toolkit] ??
+    toolkit.charAt(0).toUpperCase() + toolkit.slice(1)
+  );
 }
-
-export interface ComposioClient {
-  checkConnection(toolkit: string): Promise<boolean>;
-  executeAction(action: string, args: Record<string, unknown>): Promise<{ data: unknown }>;
-  searchActions(query: string): Promise<Array<{ name: string; description: string }>>;
-}
-
-const CAPABILITY_MAP: Record<string, ComposioMapping> = {
-  "calendar.read_events": { toolkit: "googlesuper", action: "GOOGLESUPER_LIST_EVENTS" },
-  "calendar.prepare_meeting_context": { toolkit: "googlesuper", action: "GOOGLESUPER_GET_EVENT" },
-  "crm.lookup_account": { toolkit: "hubspot", action: "HUBSPOT_SEARCH_CONTACTS" },
-  "crm.create_note": { toolkit: "hubspot", action: "HUBSPOT_CREATE_NOTE" },
-  "mail.send_followup": { toolkit: "googlesuper", action: "GOOGLESUPER_SEND_EMAIL" },
-  "mail.read_inbox": { toolkit: "googlesuper", action: "GOOGLESUPER_LIST_EMAILS" },
-  "docs.create_brief": { toolkit: "googlesuper", action: "GOOGLESUPER_CREATE_DOC" },
-  "chat.search_messages": { toolkit: "slack", action: "SLACK_SEARCH_MESSAGES" },
-  "chat.send_message": { toolkit: "slack", action: "SLACK_SEND_MESSAGE" },
-  "ats.search_candidates": { toolkit: "greenhouse", action: "GREENHOUSE_SEARCH_CANDIDATES" },
-  "ats.get_candidate": { toolkit: "greenhouse", action: "GREENHOUSE_GET_CANDIDATE" },
-  "ats.update_candidate_stage": { toolkit: "greenhouse", action: "GREENHOUSE_UPDATE_STAGE" },
-  "hris.get_employee": { toolkit: "bamboohr", action: "BAMBOOHR_GET_EMPLOYEE" },
-  "hris.list_employees": { toolkit: "bamboohr", action: "BAMBOOHR_LIST_EMPLOYEES" },
-  "project.list_tasks": { toolkit: "linear", action: "LINEAR_LIST_ISSUES" },
-  "project.create_task": { toolkit: "linear", action: "LINEAR_CREATE_ISSUE" },
-  "compensation.get_benchmarks": { toolkit: "pave", action: "PAVE_GET_BENCHMARKS" },
-};
-
-const TOOLKIT_TO_APP: Record<string, string> = {
-  googlesuper: "Google Workspace",
-  hubspot: "HubSpot",
-  salesforce: "Salesforce",
-  slack: "Slack",
-  greenhouse: "Greenhouse",
-  bamboohr: "BambooHR",
-  linear: "Linear",
-  pave: "Pave",
-};
 
 export class ComposioAdapter implements CapabilityAdapter {
   readonly id = "composio";
-  private client: ComposioClient | null;
 
-  constructor(client?: ComposioClient) {
-    this.client = client ?? null;
-  }
+  constructor(private callMcp: McpCallFn) {}
 
-  setClient(client: ComposioClient): void {
-    this.client = client;
-  }
-
-  async providesCapabilities(): Promise<CapabilityId[]> {
-    return Object.keys(CAPABILITY_MAP);
-  }
-
-  async checkReadiness(input: {
-    packId: PackId;
-    capabilityId: CapabilityId;
-  }): Promise<AdapterReadiness> {
-    const mapping = CAPABILITY_MAP[input.capabilityId];
-    if (!mapping) {
-      return { ready: false, setupAction: "none" };
-    }
-
-    if (!this.client) {
-      return {
-        ready: false,
-        missingConnections: [mapping.toolkit],
-        suggestedApps: [TOOLKIT_TO_APP[mapping.toolkit] ?? mapping.toolkit],
-        setupAction: "connect",
-      };
-    }
-
+  async probe(
+    _capabilityId: string,
+    intent: string,
+    hints?: ProbeHints
+  ): Promise<ProbeResult | null> {
     try {
-      const connected = await this.client.checkConnection(mapping.toolkit);
-      if (!connected) {
-        return {
-          ready: false,
-          missingConnections: [mapping.toolkit],
-          suggestedApps: [TOOLKIT_TO_APP[mapping.toolkit] ?? mapping.toolkit],
-          setupAction: "connect",
-        };
+      const res = (await this.callMcp(
+        "clawdi-mcp",
+        "COMPOSIO_SEARCH_TOOLS",
+        { queries: [{ use_case: intent }] }
+      )) as any;
+
+      const slugs: string[] = res?.primary_tool_slugs ?? [];
+      if (!slugs.length) return null;
+
+      // Check preferred apps from hints
+      if (hints?.preferredApps?.length) {
+        const preferred = slugs.find((s) =>
+          hints.preferredApps!.some((app) =>
+            s.toLowerCase().startsWith(app.toLowerCase())
+          )
+        );
+        if (preferred) {
+          const tk = preferred.split("_")[0].toLowerCase();
+          const statuses: Record<string, string> =
+            res?.toolkit_connection_statuses ?? {};
+          return {
+            adapterId: this.id,
+            providerDetails: { toolkit: tk, action: preferred },
+            connectionReady: statuses[tk] === "active",
+            displayName: toolkitDisplayName(tk),
+            setupHint:
+              statuses[tk] !== "active"
+                ? "Connect via OAuth"
+                : undefined,
+          };
+        }
       }
-      return { ready: true, setupAction: "none" };
-    } catch {
+
+      const action = slugs[0];
+      const toolkit = action.split("_")[0].toLowerCase();
+      const statuses: Record<string, string> =
+        res?.toolkit_connection_statuses ?? {};
+      const connected = statuses[toolkit] === "active";
+
+      let setupUrl: string | undefined;
+      if (!connected) {
+        try {
+          const conn = (await this.callMcp(
+            "clawdi-mcp",
+            "COMPOSIO_MANAGE_CONNECTIONS",
+            { toolkits: [toolkit] }
+          )) as any;
+          setupUrl = conn?.redirect_url;
+        } catch {
+          // Best-effort — OAuth URL is optional
+        }
+      }
+
       return {
-        ready: false,
-        missingConnections: [mapping.toolkit],
-        suggestedApps: [TOOLKIT_TO_APP[mapping.toolkit] ?? mapping.toolkit],
-        setupAction: "connect",
+        adapterId: this.id,
+        providerDetails: { toolkit, action },
+        connectionReady: connected,
+        displayName: toolkitDisplayName(toolkit),
+        setupHint: connected ? undefined : "Connect via OAuth",
+        setupUrl,
       };
+    } catch {
+      return null;
     }
   }
 
-  async execute(input: {
-    packId: PackId;
-    capabilityId: CapabilityId;
-    args: Record<string, unknown>;
-  }): Promise<AdapterResult> {
-    const mapping = CAPABILITY_MAP[input.capabilityId];
-    if (!mapping) {
-      return { status: "error", notes: [`No Composio mapping for ${input.capabilityId}`] };
-    }
-
-    if (!this.client) {
-      return { status: "needs_setup", notes: ["Composio client not available"] };
-    }
-
+  async execute(
+    _capabilityId: string,
+    providerDetails: unknown,
+    args: Record<string, unknown>,
+    _packId: string
+  ): Promise<AdapterResult> {
+    const { action } = providerDetails as {
+      toolkit: string;
+      action: string;
+    };
     try {
-      const result = await this.client.executeAction(mapping.action, input.args);
-      return { status: "ok", data: result.data };
+      const data = await this.callMcp(
+        "clawdi-mcp",
+        "COMPOSIO_MULTI_EXECUTE_TOOL",
+        { tool_slug: action, ...args }
+      );
+      return { status: "ok", data };
     } catch (err) {
       return {
         status: "error",
-        notes: [`Composio execution failed: ${err instanceof Error ? err.message : String(err)}`],
+        notes: [
+          `Composio execution failed: ${err instanceof Error ? err.message : String(err)}`,
+        ],
       };
     }
   }

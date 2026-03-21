@@ -1,45 +1,86 @@
 import { describe, it, expect, vi } from "vitest";
 import { OpenClawToolAdapter } from "../adapters/openclaw-tool.js";
 
+const BUILTIN_TOOLS = ["web_search", "read_file", "write_file", "glob"];
+
+function makeAdapter(tools = BUILTIN_TOOLS) {
+  return new OpenClawToolAdapter(
+    () => tools,
+    vi.fn().mockResolvedValue({ result: "data" })
+  );
+}
+
 describe("OpenClawToolAdapter", () => {
-  it("has id 'openclaw_tool'", () => {
-    const adapter = new OpenClawToolAdapter();
-    expect(adapter.id).toBe("openclaw_tool");
-  });
-
-  it("provides known capabilities", async () => {
-    const adapter = new OpenClawToolAdapter();
-    const caps = await adapter.providesCapabilities();
-    expect(caps).toContain("research.collect_sources");
-    expect(caps).toContain("research.web_search");
-  });
-
-  it("reports ready when tool is available", async () => {
-    const mockApi = {
-      isToolAvailable: vi.fn().mockResolvedValue(true),
-      invokeTool: vi.fn(),
-    };
-    const adapter = new OpenClawToolAdapter(mockApi as any);
-
-    const readiness = await adapter.checkReadiness({
-      packId: "sales",
-      capabilityId: "research.web_search",
+  describe("probe", () => {
+    it("matches exact tool name from capability ID", async () => {
+      const adapter = makeAdapter();
+      const result = await adapter.probe(
+        "research.web_search",
+        "web search"
+      );
+      expect(result).not.toBeNull();
+      expect(result!.connectionReady).toBe(true);
+      expect(result!.displayName).toBe("web_search");
+      expect(result!.providerDetails).toEqual({
+        toolName: "web_search",
+      });
     });
-    expect(readiness.ready).toBe(true);
+
+    it("returns null for unmatched capabilities", async () => {
+      const adapter = makeAdapter();
+      const result = await adapter.probe(
+        "crm.lookup_account",
+        "lookup account"
+      );
+      expect(result).toBeNull();
+    });
+
+    it("always reports connectionReady=true", async () => {
+      const adapter = makeAdapter();
+      const result = await adapter.probe(
+        "docs.read_file",
+        "read file"
+      );
+      expect(result!.connectionReady).toBe(true);
+    });
   });
 
-  it("reports not ready when tool is unavailable", async () => {
-    const mockApi = {
-      isToolAvailable: vi.fn().mockResolvedValue(false),
-      invokeTool: vi.fn(),
-    };
-    const adapter = new OpenClawToolAdapter(mockApi as any);
-
-    const readiness = await adapter.checkReadiness({
-      packId: "sales",
-      capabilityId: "research.web_search",
+  describe("execute", () => {
+    it("calls the built-in tool with args", async () => {
+      const callTool = vi
+        .fn()
+        .mockResolvedValue({ results: ["file.ts"] });
+      const adapter = new OpenClawToolAdapter(
+        () => BUILTIN_TOOLS,
+        callTool
+      );
+      const result = await adapter.execute(
+        "docs.read_file",
+        { toolName: "read_file" },
+        { path: "/src/index.ts" },
+        "sales"
+      );
+      expect(result.status).toBe("ok");
+      expect(callTool).toHaveBeenCalledWith("read_file", {
+        path: "/src/index.ts",
+      });
     });
-    expect(readiness.ready).toBe(false);
-    expect(readiness.setupAction).toBe("configure");
+
+    it("returns error on failure", async () => {
+      const callTool = vi
+        .fn()
+        .mockRejectedValue(new Error("not found"));
+      const adapter = new OpenClawToolAdapter(
+        () => BUILTIN_TOOLS,
+        callTool
+      );
+      const result = await adapter.execute(
+        "docs.read_file",
+        { toolName: "read_file" },
+        {},
+        "sales"
+      );
+      expect(result.status).toBe("error");
+    });
   });
 });

@@ -1,94 +1,75 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { CapabilityAdapter, AdapterReadiness, AdapterResult } from "./types.js";
-import type { CapabilityId, PackId } from "../capabilities/types.js";
+import type {
+  CapabilityAdapter,
+  ProbeResult,
+  AdapterResult,
+} from "./types.js";
 
 const execFileAsync = promisify(execFile);
 
-interface CliMapping {
-  bin: string;
-  buildCommand: (args: Record<string, unknown>) => string[];
-}
-
-const CAPABILITY_TO_CLI: Record<string, CliMapping> = {
-  "docs.convert_format": {
-    bin: "pandoc",
-    buildCommand: (args) => [
-      "-f", String(args.from ?? "docx"),
-      "-t", String(args.to ?? "md"),
-      String(args.input ?? "-"),
-    ],
-  },
-  "data.query_json": {
-    bin: "jq",
-    buildCommand: (args) => [String(args.filter ?? "."), String(args.input ?? "-")],
-  },
-};
-
-async function which(bin: string): Promise<string | null> {
-  try {
-    const { stdout } = await execFileAsync("which", [bin]);
-    return stdout.trim() || null;
-  } catch {
-    return null;
+function matchMapping(
+  mappings: Record<string, string>,
+  capabilityId: string
+): string | undefined {
+  for (const [pattern, bin] of Object.entries(mappings)) {
+    if (pattern === capabilityId) return bin;
+    if (
+      pattern.endsWith("*") &&
+      capabilityId.startsWith(pattern.slice(0, -1))
+    )
+      return bin;
   }
+  return undefined;
 }
 
 export class CliAdapter implements CapabilityAdapter {
   readonly id = "cli";
-  private allowedBinaries: Set<string>;
 
-  constructor(allowedBinaries?: string[]) {
-    this.allowedBinaries = new Set(allowedBinaries ?? Object.values(CAPABILITY_TO_CLI).map((m) => m.bin));
-  }
+  constructor(private cliMappings: Record<string, string>) {}
 
-  setAllowedBinaries(bins: string[]): void {
-    this.allowedBinaries = new Set(bins);
-  }
-
-  async providesCapabilities(): Promise<CapabilityId[]> {
-    return Object.keys(CAPABILITY_TO_CLI);
-  }
-
-  async checkReadiness(input: {
-    packId: PackId;
-    capabilityId: CapabilityId;
-  }): Promise<AdapterReadiness> {
-    const mapping = CAPABILITY_TO_CLI[input.capabilityId];
-    if (!mapping) {
-      return { ready: false, setupAction: "none" };
-    }
-
-    if (!this.allowedBinaries.has(mapping.bin)) {
-      return { ready: false, setupAction: "configure" };
-    }
-
-    const binPath = await which(mapping.bin);
-    return {
-      ready: !!binPath,
-      missingBins: binPath ? [] : [mapping.bin],
-      setupAction: binPath ? "none" : "install",
-    };
-  }
-
-  async execute(input: {
-    packId: PackId;
-    capabilityId: CapabilityId;
-    args: Record<string, unknown>;
-  }): Promise<AdapterResult> {
-    const mapping = CAPABILITY_TO_CLI[input.capabilityId];
-    if (!mapping) {
-      return { status: "error", notes: [`No CLI mapping for ${input.capabilityId}`] };
-    }
+  async probe(capabilityId: string): Promise<ProbeResult | null> {
+    const bin = matchMapping(this.cliMappings, capabilityId);
+    if (!bin) return null;
 
     try {
-      const cmdArgs = mapping.buildCommand(input.args);
-      const { stdout } = await execFileAsync(mapping.bin, cmdArgs, { timeout: 30_000 });
+      await execFileAsync("which", [bin]);
+      return {
+        adapterId: this.id,
+        providerDetails: { bin },
+        connectionReady: true,
+        displayName: bin,
+      };
+    } catch {
+      return {
+        adapterId: this.id,
+        providerDetails: { bin },
+        connectionReady: false,
+        displayName: bin,
+        setupHint: `Install ${bin}`,
+      };
+    }
+  }
+
+  async execute(
+    _capabilityId: string,
+    providerDetails: unknown,
+    args: Record<string, unknown>,
+    _packId: string
+  ): Promise<AdapterResult> {
+    const { bin } = providerDetails as { bin: string };
+    const cliArgs = (args.args as string[]) ?? [];
+    try {
+      const { stdout } = await execFileAsync(bin, cliArgs, {
+        timeout: 30_000,
+      });
       return { status: "ok", data: stdout };
     } catch (err) {
       return {
         status: "error",
-        notes: [`CLI execution failed: ${err instanceof Error ? err.message : String(err)}`],
+        notes: [
+          `CLI execution failed: ${err instanceof Error ? err.message : String(err)}`,
+        ],
       };
     }
   }

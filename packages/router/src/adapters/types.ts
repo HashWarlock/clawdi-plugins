@@ -1,12 +1,18 @@
-import type { CapabilityId, PackId } from "../capabilities/types.js";
+import type { CapabilityId } from "../capabilities/types.js";
 
-export interface AdapterReadiness {
-  ready: boolean;
-  missingBins?: string[];
-  missingEnv?: string[];
-  missingConnections?: string[];
-  suggestedApps?: string[];
-  setupAction?: "connect" | "install" | "configure" | "none";
+export interface ProbeHints {
+  preferredApps?: string[];
+  domain?: string;
+  pinned?: boolean;
+}
+
+export interface ProbeResult {
+  adapterId: string;
+  providerDetails: unknown;
+  connectionReady: boolean;
+  displayName: string;
+  setupHint?: string;
+  setupUrl?: string;
 }
 
 export interface AdapterResult {
@@ -23,14 +29,15 @@ export interface AdapterResult {
 
 export interface CapabilityAdapter {
   id: string;
-  providesCapabilities(): Promise<CapabilityId[]>;
-  checkReadiness(input: {
-    packId: PackId;
-    capabilityId: CapabilityId;
-  }): Promise<AdapterReadiness>;
-  execute(input: {
-    packId: PackId;
-    capabilityId: CapabilityId;
-    args: Record<string, unknown>;
-  }): Promise<AdapterResult>;
+  probe(
+    capabilityId: CapabilityId,
+    intent: string,
+    hints?: ProbeHints
+  ): Promise<ProbeResult | null>;
+  execute(
+    capabilityId: CapabilityId,
+    providerDetails: unknown,
+    args: Record<string, unknown>,
+    packId: string
+  ): Promise<AdapterResult>;
 }

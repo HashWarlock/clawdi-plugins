@@ -1,65 +1,136 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ComposioAdapter } from "../adapters/composio.js";
+import type { McpCallFn } from "../adapters/composio.js";
+
+function mockCallMcp(response: unknown = {}): McpCallFn {
+  return vi.fn().mockResolvedValue(response);
+}
+
+const SEARCH_RESPONSE = {
+  primary_tool_slugs: ["GOOGLESUPER_LIST_EVENTS"],
+  related_tool_slugs: ["GOOGLESUPER_GET_EVENT"],
+  toolkit_connection_statuses: { googlesuper: "active" },
+  tool_schemas: {},
+};
+
+const UNCONNECTED_RESPONSE = {
+  primary_tool_slugs: ["HUBSPOT_SEARCH_CONTACTS"],
+  related_tool_slugs: [],
+  toolkit_connection_statuses: { hubspot: "inactive" },
+  tool_schemas: {},
+};
 
 describe("ComposioAdapter", () => {
-  let adapter: ComposioAdapter;
-
-  beforeEach(() => {
-    adapter = new ComposioAdapter();
-  });
-
-  it("has id 'composio'", () => {
-    expect(adapter.id).toBe("composio");
-  });
-
-  it("provides known capabilities", async () => {
-    const caps = await adapter.providesCapabilities();
-    expect(caps).toContain("calendar.read_events");
-    expect(caps).toContain("crm.lookup_account");
-    expect(caps).toContain("mail.send_followup");
-  });
-
-  it("reports not ready when composio client is unavailable", async () => {
-    // Default state: no composio client injected
-    const readiness = await adapter.checkReadiness({
-      packId: "sales",
-      capabilityId: "crm.lookup_account",
+  describe("probe", () => {
+    it("returns ready probe when Composio finds a connected tool", async () => {
+      const adapter = new ComposioAdapter(mockCallMcp(SEARCH_RESPONSE));
+      const result = await adapter.probe(
+        "calendar.read_events",
+        "read events"
+      );
+      expect(result).not.toBeNull();
+      expect(result!.connectionReady).toBe(true);
+      expect(result!.displayName).toBe("Google Workspace");
+      expect(result!.providerDetails).toEqual({
+        toolkit: "googlesuper",
+        action: "GOOGLESUPER_LIST_EVENTS",
+      });
     });
-    expect(readiness.ready).toBe(false);
-    expect(readiness.setupAction).toBe("connect");
+
+    it("returns unready probe with setupHint and setupUrl when toolkit not connected", async () => {
+      const callMcp = vi.fn()
+        .mockResolvedValueOnce(UNCONNECTED_RESPONSE) // COMPOSIO_SEARCH_TOOLS
+        .mockResolvedValueOnce({ redirect_url: "https://oauth.example.com" }); // COMPOSIO_MANAGE_CONNECTIONS
+      const adapter = new ComposioAdapter(callMcp);
+      const result = await adapter.probe(
+        "crm.lookup_account",
+        "lookup account"
+      );
+      expect(result).not.toBeNull();
+      expect(result!.connectionReady).toBe(false);
+      expect(result!.setupHint).toBe("Connect via OAuth");
+      expect(result!.setupUrl).toBe("https://oauth.example.com");
+    });
+
+    it("returns null when Composio returns no slugs", async () => {
+      const adapter = new ComposioAdapter(
+        mockCallMcp({ primary_tool_slugs: [] })
+      );
+      const result = await adapter.probe("unknown.cap", "unknown cap");
+      expect(result).toBeNull();
+    });
+
+    it("returns null when MCP call throws", async () => {
+      const callMcp = vi.fn().mockRejectedValue(new Error("timeout"));
+      const adapter = new ComposioAdapter(callMcp);
+      const result = await adapter.probe(
+        "calendar.read_events",
+        "read events"
+      );
+      expect(result).toBeNull();
+    });
+
+    it("prefers toolkit from hints.preferredApps", async () => {
+      const response = {
+        primary_tool_slugs: [
+          "GOOGLESUPER_LIST_EVENTS",
+          "OUTLOOK_LIST_EVENTS",
+        ],
+        related_tool_slugs: [],
+        toolkit_connection_statuses: {
+          googlesuper: "active",
+          outlook: "active",
+        },
+        tool_schemas: {},
+      };
+      const adapter = new ComposioAdapter(mockCallMcp(response));
+      const result = await adapter.probe(
+        "calendar.read_events",
+        "read events",
+        { preferredApps: ["outlook"] }
+      );
+      expect(result!.providerDetails).toEqual(
+        expect.objectContaining({ toolkit: "outlook" })
+      );
+    });
   });
 
-  it("reports ready when composio client is available and connected", async () => {
-    const mockClient = {
-      checkConnection: vi.fn().mockResolvedValue(true),
-      executeAction: vi.fn().mockResolvedValue({ data: "test" }),
-      searchActions: vi.fn().mockResolvedValue([]),
-    };
-    adapter = new ComposioAdapter(mockClient as any);
-
-    const readiness = await adapter.checkReadiness({
-      packId: "sales",
-      capabilityId: "crm.lookup_account",
+  describe("execute", () => {
+    it("calls COMPOSIO_MULTI_EXECUTE_TOOL with the action slug", async () => {
+      const callMcp = vi
+        .fn()
+        .mockResolvedValue({ result: "meeting data" });
+      const adapter = new ComposioAdapter(callMcp);
+      const result = await adapter.execute(
+        "calendar.read_events",
+        { toolkit: "googlesuper", action: "GOOGLESUPER_LIST_EVENTS" },
+        { date: "2026-03-20" },
+        "sales"
+      );
+      expect(result.status).toBe("ok");
+      expect(callMcp).toHaveBeenCalledWith(
+        "clawdi-mcp",
+        "COMPOSIO_MULTI_EXECUTE_TOOL",
+        expect.objectContaining({
+          tool_slug: "GOOGLESUPER_LIST_EVENTS",
+          date: "2026-03-20",
+        })
+      );
     });
-    expect(readiness.ready).toBe(true);
-  });
 
-  it("executes via composio client", async () => {
-    const mockClient = {
-      checkConnection: vi.fn().mockResolvedValue(true),
-      executeAction: vi.fn().mockResolvedValue({
-        data: { accounts: [{ name: "Acme" }] },
-      }),
-      searchActions: vi.fn().mockResolvedValue([]),
-    };
-    adapter = new ComposioAdapter(mockClient as any);
-
-    const result = await adapter.execute({
-      packId: "sales",
-      capabilityId: "crm.lookup_account",
-      args: { query: "Acme" },
+    it("returns error on execution failure", async () => {
+      const callMcp = vi
+        .fn()
+        .mockRejectedValue(new Error("connection lost"));
+      const adapter = new ComposioAdapter(callMcp);
+      const result = await adapter.execute(
+        "calendar.read_events",
+        { toolkit: "googlesuper", action: "LIST_EVENTS" },
+        {},
+        "sales"
+      );
+      expect(result.status).toBe("error");
+      expect(result.notes?.[0]).toContain("connection lost");
     });
-    expect(result.status).toBe("ok");
-    expect(result.data).toEqual({ accounts: [{ name: "Acme" }] });
   });
 });

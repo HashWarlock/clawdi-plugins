@@ -1,4 +1,0 @@
-{
-  "adapterOrder": ["composio", "openclaw_tool", "lobster", "cli", "mcporter"],
-  "executionTimeoutMs": 30000
-}

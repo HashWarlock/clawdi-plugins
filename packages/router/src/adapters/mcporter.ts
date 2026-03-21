@@ -1,96 +1,78 @@
-import type { CapabilityAdapter, AdapterReadiness, AdapterResult } from "./types.js";
-import type { CapabilityId, PackId } from "../capabilities/types.js";
+import type {
+  CapabilityAdapter,
+  ProbeResult,
+  AdapterResult,
+} from "./types.js";
 
-export interface McporterClient {
-  isServerAvailable(server: string): Promise<boolean>;
-  callTool(server: string, tool: string, args: Record<string, unknown>): Promise<unknown>;
+export interface McpServer {
+  name: string;
+  tools: Array<{ name: string; description?: string }>;
 }
-
-interface McpMapping {
-  server: string;
-  tool: string;
-}
-
-const CAPABILITY_TO_MCP: Record<string, McpMapping> = {
-  "seo.audit_page": { server: "ahrefs", tool: "site_audit" },
-  "seo.keyword_research": { server: "ahrefs", tool: "keyword_research" },
-  "analytics.get_metrics": { server: "google-analytics", tool: "get_report" },
-  "enrichment.lookup_company": { server: "clearbit", tool: "company_lookup" },
-  "enrichment.lookup_person": { server: "clearbit", tool: "person_lookup" },
-};
 
 export class McporterAdapter implements CapabilityAdapter {
   readonly id = "mcporter";
-  private client: McporterClient | null;
-  private allowedServers: Set<string>;
 
-  constructor(client?: McporterClient, allowedServers?: string[]) {
-    this.client = client ?? null;
-    this.allowedServers = new Set(allowedServers ?? Object.values(CAPABILITY_TO_MCP).map((m) => m.server));
-  }
+  constructor(
+    private listServers: () => Promise<McpServer[]>,
+    private callTool: (
+      server: string,
+      tool: string,
+      args: Record<string, unknown>
+    ) => Promise<unknown>
+  ) {}
 
-  setClient(client: McporterClient): void {
-    this.client = client;
-  }
-
-  setAllowedServers(servers: string[]): void {
-    this.allowedServers = new Set(servers);
-  }
-
-  async providesCapabilities(): Promise<CapabilityId[]> {
-    return Object.keys(CAPABILITY_TO_MCP);
-  }
-
-  async checkReadiness(input: {
-    packId: PackId;
-    capabilityId: CapabilityId;
-  }): Promise<AdapterReadiness> {
-    const mapping = CAPABILITY_TO_MCP[input.capabilityId];
-    if (!mapping) {
-      return { ready: false, setupAction: "none" };
-    }
-
-    if (!this.allowedServers.has(mapping.server)) {
-      return { ready: false, setupAction: "configure" };
-    }
-
-    if (!this.client) {
-      return {
-        ready: false,
-        missingConnections: [mapping.server],
-        setupAction: "configure",
-      };
-    }
-
+  async probe(
+    _capabilityId: string,
+    intent: string
+  ): Promise<ProbeResult | null> {
     try {
-      const available = await this.client.isServerAvailable(mapping.server);
-      return {
-        ready: available,
-        missingConnections: available ? [] : [mapping.server],
-        setupAction: available ? "none" : "configure",
-      };
+      const servers = await this.listServers();
+      const keywords = intent.toLowerCase().split(" ");
+
+      for (const server of servers) {
+        for (const tool of server.tools) {
+          const nameHaystack = tool.name.replace(/_/g, " ").toLowerCase();
+          const descHaystack = (tool.description ?? "").toLowerCase();
+          const matchesName = keywords.some((kw) => nameHaystack.includes(kw));
+          const matchesDesc = keywords.some((kw) => descHaystack.includes(kw));
+          if (matchesName && (matchesDesc || !tool.description)) {
+            return {
+              adapterId: this.id,
+              providerDetails: {
+                server: server.name,
+                tool: tool.name,
+              },
+              connectionReady: true,
+              displayName: `${tool.name} (${server.name})`,
+            };
+          }
+        }
+      }
+      return null;
     } catch {
-      return { ready: false, missingConnections: [mapping.server], setupAction: "configure" };
+      return null;
     }
   }
 
-  async execute(input: {
-    packId: PackId;
-    capabilityId: CapabilityId;
-    args: Record<string, unknown>;
-  }): Promise<AdapterResult> {
-    const mapping = CAPABILITY_TO_MCP[input.capabilityId];
-    if (!mapping || !this.client) {
-      return { status: "error", notes: [`No MCPorter mapping for ${input.capabilityId}`] };
-    }
-
+  async execute(
+    _capabilityId: string,
+    providerDetails: unknown,
+    args: Record<string, unknown>,
+    _packId: string
+  ): Promise<AdapterResult> {
+    const { server, tool } = providerDetails as {
+      server: string;
+      tool: string;
+    };
     try {
-      const result = await this.client.callTool(mapping.server, mapping.tool, input.args);
-      return { status: "ok", data: result };
+      const data = await this.callTool(server, tool, args);
+      return { status: "ok", data };
     } catch (err) {
       return {
         status: "error",
-        notes: [`MCPorter call failed: ${err instanceof Error ? err.message : String(err)}`],
+        notes: [
+          `MCPorter execution failed: ${err instanceof Error ? err.message : String(err)}`,
+        ],
       };
     }
   }
