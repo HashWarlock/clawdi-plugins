@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { LobsterAdapter } from "../adapters/lobster.js";
 import { CliAdapter } from "../adapters/cli.js";
+import { McporterAdapter } from "../adapters/mcporter.js";
+import type { McpServer } from "../adapters/mcporter.js";
 
 const WORKFLOWS = [
   "create-note-with-approval",
@@ -138,6 +140,104 @@ describe("CliAdapter", () => {
         "sales"
       );
       expect(result.status).toBe("error");
+    });
+  });
+});
+
+const MOCK_SERVERS: McpServer[] = [
+  {
+    name: "ahrefs",
+    tools: [
+      { name: "site_audit", description: "Audit a website for SEO" },
+      { name: "keyword_research", description: "Research keywords" },
+    ],
+  },
+  {
+    name: "clearbit",
+    tools: [
+      { name: "company_lookup", description: "Look up company data" },
+    ],
+  },
+];
+
+describe("McporterAdapter", () => {
+  function makeAdapter(servers = MOCK_SERVERS) {
+    return new McporterAdapter(
+      vi.fn().mockResolvedValue(servers),
+      vi.fn().mockResolvedValue({ data: "result" })
+    );
+  }
+
+  describe("probe", () => {
+    it("matches intent keywords against tool names/descriptions", async () => {
+      const adapter = makeAdapter();
+      const result = await adapter.probe(
+        "seo.audit_page",
+        "audit page"
+      );
+      expect(result).not.toBeNull();
+      expect(result!.providerDetails).toEqual({
+        server: "ahrefs",
+        tool: "site_audit",
+      });
+    });
+
+    it("returns null when no tool matches", async () => {
+      const adapter = makeAdapter();
+      const result = await adapter.probe(
+        "crm.lookup_account",
+        "lookup account"
+      );
+      expect(result).toBeNull();
+    });
+
+    it("returns null when listServers throws", async () => {
+      const adapter = new McporterAdapter(
+        vi.fn().mockRejectedValue(new Error("unreachable")),
+        vi.fn()
+      );
+      const result = await adapter.probe(
+        "seo.audit_page",
+        "audit page"
+      );
+      expect(result).toBeNull();
+    });
+
+    it("matches across tool description text", async () => {
+      const adapter = makeAdapter();
+      const result = await adapter.probe(
+        "enrichment.lookup_company",
+        "lookup company"
+      );
+      expect(result).not.toBeNull();
+      expect(result!.providerDetails).toEqual({
+        server: "clearbit",
+        tool: "company_lookup",
+      });
+    });
+  });
+
+  describe("execute", () => {
+    it("calls the matched MCP server tool", async () => {
+      const callTool = vi
+        .fn()
+        .mockResolvedValue({ score: 85 });
+      const adapter = new McporterAdapter(
+        vi.fn().mockResolvedValue(MOCK_SERVERS),
+        callTool
+      );
+      const result = await adapter.execute(
+        "seo.audit_page",
+        { server: "ahrefs", tool: "site_audit" },
+        { url: "https://example.com" },
+        "marketing"
+      );
+      expect(result.status).toBe("ok");
+      expect(callTool).toHaveBeenCalledWith(
+        "ahrefs",
+        "site_audit",
+        { url: "https://example.com" }
+      );
     });
   });
 });
