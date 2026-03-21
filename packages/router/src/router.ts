@@ -113,6 +113,7 @@ export class Router {
       };
     }
 
+    let execTimer: ReturnType<typeof setTimeout>;
     try {
       const execPromise = adapter.execute(
         capabilityId,
@@ -120,14 +121,17 @@ export class Router {
         args,
         packId
       );
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        execTimer = setTimeout(
           () => reject(new Error("Execution timeout (30s)")),
           30_000
-        )
-      );
-      return await Promise.race([execPromise, timeoutPromise]);
+        );
+      });
+      const result = await Promise.race([execPromise, timeoutPromise]);
+      clearTimeout(execTimer!);
+      return result;
     } catch (err) {
+      clearTimeout(execTimer!);
       this.engine.invalidate(capabilityId);
       return {
         status: "error",

@@ -35,7 +35,7 @@ export class McporterAdapter implements CapabilityAdapter {
           const descHaystack = (tool.description ?? "").toLowerCase();
           const matchesName = keywords.some((kw) => nameHaystack.includes(kw));
           const matchesDesc = keywords.some((kw) => descHaystack.includes(kw));
-          if (matchesName && matchesDesc) {
+          if (matchesName && (matchesDesc || !tool.description)) {
             return {
               adapterId: this.id,
               providerDetails: {

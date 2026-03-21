@@ -136,23 +136,19 @@ export class DiscoveryEngine {
     const hints = this.buildHints(capabilityId, packId, domain);
     const results: ProbeResult[] = [];
 
-    const promises = Array.from(this.adapterMap.values())
-      .filter((a) => !this.config.disabledAdapters.includes(a.id))
-      .map(async (adapter) => {
-        try {
-          const probe = await this.probeWithTimeout(
-            adapter,
-            capabilityId,
-            intent,
-            hints
-          );
-          if (probe) results.push(probe);
-        } catch {
-          // Skip failed probes
-        }
-      });
+    const settled = await Promise.allSettled(
+      Array.from(this.adapterMap.values())
+        .filter((a) => !this.config.disabledAdapters.includes(a.id))
+        .map((adapter) =>
+          this.probeWithTimeout(adapter, capabilityId, intent, hints)
+        )
+    );
 
-    await Promise.all(promises);
+    for (const entry of settled) {
+      if (entry.status === "fulfilled" && entry.value) {
+        results.push(entry.value);
+      }
+    }
 
     // Warm cache with first ready result
     for (const probe of results) {
@@ -230,11 +226,17 @@ export class DiscoveryEngine {
     intent: string,
     hints: ProbeHints
   ): Promise<ProbeResult | null> {
-    return Promise.race([
-      adapter.probe(capabilityId, intent, hints),
-      new Promise<null>((resolve) =>
-        setTimeout(() => resolve(null), this.config.probeTimeoutMs)
-      ),
-    ]);
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), this.config.probeTimeoutMs);
+    });
+    try {
+      return await Promise.race([
+        adapter.probe(capabilityId, intent, hints),
+        timeout,
+      ]);
+    } finally {
+      clearTimeout(timer!);
+    }
   }
 }
