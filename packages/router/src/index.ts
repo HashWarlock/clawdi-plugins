@@ -1,3 +1,5 @@
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { Router } from "./router.js";
 import { ComposioAdapter } from "./adapters/composio.js";
 import { OpenClawToolAdapter } from "./adapters/openclaw-tool.js";
@@ -10,69 +12,74 @@ import {
   formatCheckSetup,
 } from "./onboarding/check-setup.js";
 
-interface OpenClawPluginApi {
-  registerTool(tool: {
-    name: string;
-    description: string;
-    parameters: Record<string, unknown>;
-    handler: (args: any) => Promise<unknown>;
-  }): void;
-  registerCommand(command: {
-    name: string;
-    description: string;
-    handler: (ctx: any) => Promise<unknown>;
-  }): void;
-  on(event: string, handler: (...args: any[]) => Promise<void>): void;
-  getEnabledPlugins(): Array<{
-    id: string;
-    installPath: string;
-  }>;
-  getConfig(): Record<string, unknown>;
-  runtime: {
-    callMcpTool(
-      server: string,
-      tool: string,
-      args: Record<string, unknown>
-    ): Promise<unknown>;
-    listBuiltinTools(): string[];
-    callBuiltinTool(
-      name: string,
-      args: Record<string, unknown>
-    ): Promise<unknown>;
-    listLobsterWorkflows(): Promise<string[]>;
-    runLobsterWorkflow(
-      id: string,
-      args: Record<string, unknown>
-    ): Promise<unknown>;
-    listMcpServers(): Promise<
-      Array<{
-        name: string;
-        tools: Array<{ name: string; description?: string }>;
-      }>
-    >;
-  };
+// Use permissive type — the plugin API shape varies across OpenClaw versions
+type PluginApi = any;
+
+const DEFAULT_CONFIG = {
+  adapterOrder: ["composio", "openclaw_tool", "lobster", "cli", "mcporter"],
+  disabledAdapters: [] as string[],
+  capabilityPins: {} as Record<string, string>,
+  sideEffectPolicy: "confirm_destructive",
+  cacheTtl: 600000,
+  cliMappings: {} as Record<string, string>,
+};
+
+function resolveConfig(api: PluginApi) {
+  return {
+    ...DEFAULT_CONFIG,
+    ...((api?.getConfig?.() as Record<string, unknown>) ?? {}),
+  } as typeof DEFAULT_CONFIG;
 }
 
-export function register(api: OpenClawPluginApi) {
-  const config = api.getConfig() as any;
+/**
+ * Discover pack install paths. First tries the plugin API registry,
+ * then falls back to scanning /data/openclaw/extensions/pack-*.
+ */
+function discoverPackInstallPaths(api: PluginApi): string[] {
+  const pathsFromApi =
+    api
+      ?.getEnabledPlugins?.()
+      ?.filter((p: any) => {
+        const id = String(p?.id ?? "");
+        return id.startsWith("pack-") || id.startsWith("@clawdi-ai/pack-");
+      })
+      ?.map((p: any) => p.installPath) ?? [];
 
-  // Create adapters with runtime callbacks
+  if (pathsFromApi.length) return pathsFromApi;
+
+  // Filesystem fallback for environments without plugin registry
+  const root = "/data/openclaw/extensions";
+  if (!existsSync(root)) return [];
+
+  return readdirSync(root, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && d.name.startsWith("pack-"))
+    .map((d) => join(root, d.name));
+}
+
+export function register(api: PluginApi) {
+  const config = resolveConfig(api);
+
+  // Create adapters with runtime callbacks (safe-access for optional runtime methods)
   const composio = new ComposioAdapter((server, tool, args) =>
-    api.runtime.callMcpTool(server, tool, args)
+    api?.runtime?.callMcpTool?.(server, tool, args) ?? Promise.resolve(null)
   );
   const openclawTool = new OpenClawToolAdapter(
-    () => api.runtime.listBuiltinTools(),
-    (name, args) => api.runtime.callBuiltinTool(name, args)
+    () => api?.runtime?.listBuiltinTools?.() ?? [],
+    (name, args) =>
+      api?.runtime?.callBuiltinTool?.(name, args) ?? Promise.resolve(null)
   );
   const lobster = new LobsterAdapter(
-    () => api.runtime.listLobsterWorkflows(),
-    (id, args) => api.runtime.runLobsterWorkflow(id, args)
+    () =>
+      api?.runtime?.listLobsterWorkflows?.() ?? Promise.resolve([]),
+    (id, args) =>
+      api?.runtime?.runLobsterWorkflow?.(id, args) ?? Promise.resolve(null)
   );
   const cli = new CliAdapter(config.cliMappings ?? {});
   const mcporter = new McporterAdapter(
-    () => api.runtime.listMcpServers(),
+    () =>
+      api?.runtime?.listMcpServers?.() ?? Promise.resolve([]),
     (server, tool, args) =>
-      api.runtime.callMcpTool(server, tool, args)
+      api?.runtime?.callMcpTool?.(server, tool, args) ?? Promise.resolve(null)
   );
 
   const adapters = [composio, openclawTool, lobster, cli, mcporter];
@@ -87,19 +94,14 @@ export function register(api: OpenClawPluginApi) {
 
   // Discover packs at startup
   api.on("gateway_start", async () => {
-    const allPlugins = api.getEnabledPlugins();
-    const packs = allPlugins.filter((p) =>
-      p.id.startsWith("@clawdi-ai/pack-")
-    );
-    for (const pack of packs) {
+    const packPaths = discoverPackInstallPaths(api);
+    for (const installPath of packPaths) {
       try {
-        const manifest = await Router.loadPackManifest(
-          pack.installPath
-        );
+        const manifest = await Router.loadPackManifest(installPath);
         router.registerPack(manifest);
       } catch (err) {
         console.error(
-          `[knowledge-work-router] Failed to load pack from ${pack.installPath}:`,
+          `[knowledge-work-router] Failed to load pack from ${installPath}:`,
           err
         );
       }
@@ -141,7 +143,7 @@ export function register(api: OpenClawPluginApi) {
       packId,
       args,
       confirmationToken,
-    }) => {
+    }: any) => {
       if (confirmationToken) {
         return router.executeConfirmed(confirmationToken);
       }
@@ -167,7 +169,7 @@ export function register(api: OpenClawPluginApi) {
         } else {
           if (pr.ready.length) {
             lines.push(
-              `Ready: ${pr.ready.map((r) => `${r.capabilityId} -> ${r.displayName}`).join(", ")}`
+              `Ready: ${pr.ready.map((r: any) => `${r.capabilityId} -> ${r.displayName}`).join(", ")}`
             );
           }
           for (const s of pr.needsSetup) {
@@ -180,7 +182,7 @@ export function register(api: OpenClawPluginApi) {
           }
         }
       }
-      return { systemPrompt: lines.join("\n") };
+      return { text: lines.join("\n") || "No packs discovered." };
     },
   });
 
@@ -196,7 +198,7 @@ export function register(api: OpenClawPluginApi) {
         adapters,
         config.disabledAdapters ?? []
       );
-      return { systemPrompt: formatCheckSetup(status) };
+      return { text: formatCheckSetup(status) };
     },
   });
 }

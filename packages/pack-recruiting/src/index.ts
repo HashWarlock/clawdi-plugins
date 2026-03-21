@@ -11,7 +11,7 @@ export function register(api: OpenClawPluginApi) {
     name: "draft_offer",
     description: "Draft an offer letter with compensation details",
     handler: async () => ({
-      systemPrompt: "Use the recruiting-draft-offer skill. Ask the user for the role and level.",
+      text: "Use the recruiting-draft-offer skill. Ask the user for the role and level.",
     }),
   });
 }

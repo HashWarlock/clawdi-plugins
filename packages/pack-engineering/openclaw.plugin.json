@@ -1,5 +1,5 @@
 {
-  "id": "@clawdi-ai/pack-engineering",
+  "id": "pack-engineering",
   "name": "Engineering Pack",
   "description": "AI-powered engineering workflows: code review prep, incident response, architecture review, sprint retro, tech debt tracking, and documentation generation",
   "version": "0.1.0",

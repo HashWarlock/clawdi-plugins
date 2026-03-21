@@ -5,7 +5,7 @@ export function register(api: OpenClawPluginApi) {
     name: "code_review_prep",
     description: "Prepare a comprehensive code review brief for open PRs",
     handler: async () => ({
-      systemPrompt:
+      text:
         "Use the engineering-code-review-prep skill to prepare code review briefs for the team's open pull requests.",
     }),
   });
@@ -14,7 +14,7 @@ export function register(api: OpenClawPluginApi) {
     name: "incident_response",
     description: "Coordinate incident response with context gathering and task creation",
     handler: async () => ({
-      systemPrompt:
+      text:
         "Use the engineering-incident-response skill to coordinate the response to the reported incident.",
     }),
   });
@@ -23,7 +23,7 @@ export function register(api: OpenClawPluginApi) {
     name: "architecture_review",
     description: "Conduct an architecture review for a proposed design or system",
     handler: async () => ({
-      systemPrompt:
+      text:
         "Use the engineering-architecture-review skill to review the specified architecture or design proposal.",
     }),
   });
@@ -32,7 +32,7 @@ export function register(api: OpenClawPluginApi) {
     name: "sprint_retro",
     description: "Generate a sprint retrospective summary with metrics and insights",
     handler: async () => ({
-      systemPrompt:
+      text:
         "Use the engineering-sprint-retro skill to generate a retrospective for the current or most recent sprint.",
     }),
   });
@@ -41,7 +41,7 @@ export function register(api: OpenClawPluginApi) {
     name: "tech_debt_report",
     description: "Track and report on technical debt across the codebase",
     handler: async () => ({
-      systemPrompt:
+      text:
         "Use the engineering-tech-debt-tracker skill to generate a technical debt report.",
     }),
   });
@@ -50,7 +50,7 @@ export function register(api: OpenClawPluginApi) {
     name: "generate_docs",
     description: "Generate technical documentation from code and discussions",
     handler: async () => ({
-      systemPrompt:
+      text:
         "Use the engineering-documentation-gen skill to generate documentation for the specified topic or component.",
     }),
   });

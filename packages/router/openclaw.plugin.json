@@ -1,5 +1,5 @@
 {
-  "id": "@clawdi-ai/knowledge-work-router",
+  "id": "knowledge-work-router",
   "name": "Knowledge Work Router",
   "description": "Capability router for knowledge-work packs. Discovers available services dynamically through adapters (Composio, native tools, Lobster, CLI, MCPorter) with automatic fallback and onboarding.",
   "version": "0.2.0",

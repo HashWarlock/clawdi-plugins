@@ -1,5 +1,5 @@
 {
-  "id": "@clawdi-ai/pack-enterprise-search",
+  "id": "pack-enterprise-search",
   "name": "Enterprise Search Pack",
   "description": "AI-powered enterprise search workflows: multi-source search, search strategy planning, knowledge synthesis, and daily information digests",
   "version": "0.1.0",

@@ -1,5 +1,5 @@
 {
-  "id": "@clawdi-ai/pack-product-management",
+  "id": "pack-product-management",
   "name": "Product Management Pack",
   "description": "AI-powered product management workflows: spec writing, sprint planning, roadmap updates, metrics review, competitive briefs, brainstorming, stakeholder updates, and research synthesis",
   "version": "0.1.0",

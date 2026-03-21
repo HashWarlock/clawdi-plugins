@@ -9,7 +9,7 @@ export function register(api: OpenClawPluginApi) {
     name: "performance_review",
     description: "Structure a performance review with self-assessment, manager review, or calibration templates",
     handler: async () => ({
-      systemPrompt: "Use the performance-review skill to help structure a performance review.",
+      text: "Use the performance-review skill to help structure a performance review.",
     }),
   });
 
@@ -17,7 +17,7 @@ export function register(api: OpenClawPluginApi) {
     name: "comp_analysis",
     description: "Run compensation benchmarking, band placement, or equity modeling",
     handler: async () => ({
-      systemPrompt: "Use the comp-analysis skill to analyze compensation.",
+      text: "Use the comp-analysis skill to analyze compensation.",
     }),
   });
 
@@ -25,7 +25,7 @@ export function register(api: OpenClawPluginApi) {
     name: "people_report",
     description: "Generate a people analytics report on headcount, attrition, diversity, or org health",
     handler: async () => ({
-      systemPrompt: "Use the people-report skill to generate a people analytics report.",
+      text: "Use the people-report skill to generate a people analytics report.",
     }),
   });
 
@@ -33,7 +33,7 @@ export function register(api: OpenClawPluginApi) {
     name: "policy_lookup",
     description: "Find and explain a company policy in plain language",
     handler: async () => ({
-      systemPrompt: "Use the policy-lookup skill to find and explain the requested policy.",
+      text: "Use the policy-lookup skill to find and explain the requested policy.",
     }),
   });
 
@@ -41,7 +41,7 @@ export function register(api: OpenClawPluginApi) {
     name: "onboarding_plan",
     description: "Generate an onboarding checklist and first-week plan for a new hire",
     handler: async () => ({
-      systemPrompt: "Use the onboarding-plan skill to create an onboarding plan for the new hire.",
+      text: "Use the onboarding-plan skill to create an onboarding plan for the new hire.",
     }),
   });
 
@@ -49,7 +49,7 @@ export function register(api: OpenClawPluginApi) {
     name: "employee_handbook",
     description: "Create or update an employee handbook section",
     handler: async () => ({
-      systemPrompt: "Use the employee-handbook skill to create or update a handbook section.",
+      text: "Use the employee-handbook skill to create or update a handbook section.",
     }),
   });
 
@@ -57,7 +57,7 @@ export function register(api: OpenClawPluginApi) {
     name: "exit_interview",
     description: "Structure an exit interview process or analyze departure patterns",
     handler: async () => ({
-      systemPrompt: "Use the exit-interview skill to structure the exit interview process.",
+      text: "Use the exit-interview skill to structure the exit interview process.",
     }),
   });
 }

@@ -11,7 +11,7 @@ export function register(api: OpenClawPluginApi) {
     name: "plan_day",
     description: "Generate a prioritized daily plan based on your calendar, tasks, and emails",
     handler: async () => ({
-      systemPrompt: "Use the productivity-daily-planner skill to plan the user's day.",
+      text: "Use the productivity-daily-planner skill to plan the user's day.",
     }),
   });
 
@@ -19,7 +19,7 @@ export function register(api: OpenClawPluginApi) {
     name: "weekly_review",
     description: "Run a weekly review: what happened, what's next, what needs attention",
     handler: async () => ({
-      systemPrompt: "Use the productivity-weekly-review skill to run the user's weekly review.",
+      text: "Use the productivity-weekly-review skill to run the user's weekly review.",
     }),
   });
 }

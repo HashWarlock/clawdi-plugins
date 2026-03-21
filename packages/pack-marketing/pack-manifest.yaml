@@ -3,11 +3,11 @@ displayName: "Marketing Pack"
 capabilities:
   required:
     - research.web_search
+    - docs.create_brief
+  optional:
     - analytics.get_metrics
     - seo.audit_page
     - seo.keyword_research
-    - docs.create_brief
-  optional:
     - mail.send_followup
     - chat.search_messages
     - enrichment.lookup_company
@@ -16,14 +16,14 @@ preferredApps:
     - google_workspace
     - bing
   analytics.get_metrics:
+    - googlesuper
     - google_analytics
-    - hubspot
   seo.audit_page:
-    - semrush
-    - ahrefs
+    - googlesearchconsole
+    - googlesuper
   seo.keyword_research:
-    - semrush
-    - ahrefs
+    - googlesearchconsole
+    - googlesuper
   docs.create_brief:
     - google_workspace
     - notion
