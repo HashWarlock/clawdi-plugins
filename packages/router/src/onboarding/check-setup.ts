@@ -1,4 +1,8 @@
-import type { PackManifest, CapabilityId } from "../capabilities/types.js";
+import type {
+  PackManifest,
+  CapabilityId,
+} from "../capabilities/types.js";
+import type { DiscoveryEngine } from "../discovery/engine.js";
 import type { CapabilityAdapter } from "../adapters/types.js";
 
 export interface SetupStatus {
@@ -8,61 +12,66 @@ export interface SetupStatus {
     capabilities: Array<{
       id: CapabilityId;
       required: boolean;
-      status: "ready" | "needs_setup";
+      status: "ready" | "needs_setup" | "not_found";
       resolvedAdapter?: string;
-      resolvedApp?: string;
+      displayName?: string;
+      setupHint?: string;
     }>;
   }>;
-  adapterStatuses: Array<{
-    id: string;
-    loaded: boolean;
-    notes?: string[];
-  }>;
+  adapterStatuses: Array<{ id: string; enabled: boolean }>;
 }
 
 export async function runCheckSetup(
   packs: PackManifest[],
+  engine: DiscoveryEngine,
   adapters: CapabilityAdapter[],
   disabledAdapters: string[]
 ): Promise<SetupStatus> {
   const disabled = new Set(disabledAdapters);
-
   const packStatuses: SetupStatus["packStatuses"] = [];
 
   for (const pack of packs) {
     const allCaps = [
-      ...pack.capabilities.required.map((c) => ({ id: c, required: true })),
-      ...pack.capabilities.optional.map((c) => ({ id: c, required: false })),
+      ...pack.capabilities.required.map((c) => ({
+        id: c,
+        required: true,
+      })),
+      ...pack.capabilities.optional.map((c) => ({
+        id: c,
+        required: false,
+      })),
     ];
 
-    const capabilities: SetupStatus["packStatuses"][0]["capabilities"] = [];
+    const capabilities: SetupStatus["packStatuses"][0]["capabilities"] =
+      [];
 
     for (const { id: capId, required } of allCaps) {
-      let resolved = false;
-      let resolvedAdapter: string | undefined;
+      const probes = await engine.probeAll(capId, pack.packId);
+      const readyProbe = probes.find((p) => p.connectionReady);
 
-      for (const adapter of adapters) {
-        if (disabled.has(adapter.id)) continue;
-        const caps = await adapter.providesCapabilities();
-        if (!caps.includes(capId)) continue;
-
-        const readiness = await adapter.checkReadiness({
-          packId: pack.packId,
-          capabilityId: capId,
+      if (readyProbe) {
+        capabilities.push({
+          id: capId,
+          required,
+          status: "ready",
+          resolvedAdapter: readyProbe.adapterId,
+          displayName: readyProbe.displayName,
         });
-        if (readiness.ready) {
-          resolved = true;
-          resolvedAdapter = adapter.id;
-          break;
-        }
+      } else if (probes.length > 0) {
+        capabilities.push({
+          id: capId,
+          required,
+          status: "needs_setup",
+          displayName: probes[0].displayName,
+          setupHint: probes[0].setupHint,
+        });
+      } else {
+        capabilities.push({
+          id: capId,
+          required,
+          status: "not_found",
+        });
       }
-
-      capabilities.push({
-        id: capId,
-        required,
-        status: resolved ? "ready" : "needs_setup",
-        resolvedAdapter,
-      });
     }
 
     packStatuses.push({
@@ -74,8 +83,7 @@ export async function runCheckSetup(
 
   const adapterStatuses = adapters.map((a) => ({
     id: a.id,
-    loaded: !disabled.has(a.id),
-    notes: disabled.has(a.id) ? ["Disabled by config"] : undefined,
+    enabled: !disabled.has(a.id),
   }));
 
   return { packStatuses, adapterStatuses };
@@ -87,18 +95,28 @@ export function formatCheckSetup(status: SetupStatus): string {
   for (const pack of status.packStatuses) {
     lines.push(`\n${pack.displayName}`);
     for (const cap of pack.capabilities) {
-      const icon = cap.status === "ready" ? "+" : cap.required ? "X" : "?";
-      const suffix = cap.resolvedAdapter ? ` -> ${cap.resolvedAdapter}` : " -> needs setup";
+      const icon =
+        cap.status === "ready"
+          ? "[+]"
+          : cap.status === "needs_setup"
+            ? "[!]"
+            : "[X]";
+      const suffix = cap.resolvedAdapter
+        ? ` -> ${cap.displayName} (via ${cap.resolvedAdapter})`
+        : cap.setupHint
+          ? ` -> ${cap.setupHint}`
+          : " -> no provider found";
       const optLabel = cap.required ? "" : " (optional)";
-      lines.push(`  [${icon}] ${cap.id}${suffix}${optLabel}`);
+      lines.push(`  ${icon} ${cap.id}${suffix}${optLabel}`);
     }
   }
 
-  lines.push("\nRouter adapters:");
+  lines.push("\nAdapters:");
   for (const adapter of status.adapterStatuses) {
-    const icon = adapter.loaded ? "+" : "-";
-    const note = adapter.notes?.length ? ` (${adapter.notes.join(", ")})` : "";
-    lines.push(`  [${icon}] ${adapter.id}${note}`);
+    const icon = adapter.enabled ? "[+]" : "[-]";
+    lines.push(
+      `  ${icon} ${adapter.id}${adapter.enabled ? "" : " (disabled)"}`
+    );
   }
 
   return lines.join("\n");
