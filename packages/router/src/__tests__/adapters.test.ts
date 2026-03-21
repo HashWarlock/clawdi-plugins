@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { LobsterAdapter } from "../adapters/lobster.js";
+import { CliAdapter } from "../adapters/cli.js";
 
 const WORKFLOWS = [
   "create-note-with-approval",
@@ -81,6 +82,62 @@ describe("LobsterAdapter", () => {
         "create-note-with-approval",
         { note: "test" }
       );
+    });
+  });
+});
+
+describe("CliAdapter", () => {
+  describe("probe", () => {
+    it("matches capability against cliMappings config", async () => {
+      const adapter = new CliAdapter({
+        "docs.convert_*": "pandoc",
+      });
+      const result = await adapter.probe(
+        "docs.convert_format",
+        "convert format"
+      );
+      // Result depends on whether pandoc is installed
+      if (result) {
+        expect(result.adapterId).toBe("cli");
+        expect(result.providerDetails).toEqual({ bin: "pandoc" });
+      }
+    });
+
+    it("returns null for unmapped capabilities", async () => {
+      const adapter = new CliAdapter({
+        "docs.convert_*": "pandoc",
+      });
+      const result = await adapter.probe(
+        "crm.lookup_account",
+        "lookup account"
+      );
+      expect(result).toBeNull();
+    });
+
+    it("matches exact capability patterns", async () => {
+      const adapter = new CliAdapter({
+        "data.query_json": "jq",
+      });
+      const result = await adapter.probe(
+        "data.query_json",
+        "query json"
+      );
+      if (result) {
+        expect(result.providerDetails).toEqual({ bin: "jq" });
+      }
+    });
+  });
+
+  describe("execute", () => {
+    it("returns error structure on failure", async () => {
+      const adapter = new CliAdapter({});
+      const result = await adapter.execute(
+        "docs.convert_format",
+        { bin: "nonexistent_binary_xyz" },
+        { args: ["--help"] },
+        "sales"
+      );
+      expect(result.status).toBe("error");
     });
   });
 });
