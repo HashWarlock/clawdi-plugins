@@ -15,19 +15,30 @@ pnpm install
 pnpm build
 ```
 
-2. Enable the router and your desired packs in `openclaw.json`:
+2. Copy the built extensions into your OpenClaw extensions directory:
+
+```bash
+# Copy router
+cp -r packages/router /data/openclaw/extensions/knowledge-work-router
+
+# Copy desired packs
+cp -r packages/pack-sales /data/openclaw/extensions/pack-sales
+cp -r packages/pack-productivity /data/openclaw/extensions/pack-productivity
+```
+
+3. Enable in your `openclaw.json`:
 
 ```json
 {
   "plugins": {
-    "@clawdi-ai/knowledge-work-router": { "enabled": true },
-    "@clawdi-ai/pack-sales": { "enabled": true },
-    "@clawdi-ai/pack-productivity": { "enabled": true }
+    "knowledge-work-router": { "enabled": true },
+    "pack-sales": { "enabled": true },
+    "pack-productivity": { "enabled": true }
   }
 }
 ```
 
-3. Run `/connect_apps` to discover and connect services.
+4. Restart the agent and run `/connect_apps` to discover and connect services.
 
 ## Available Packs
 
@@ -67,14 +78,14 @@ No hardcoded service list — the router adapts to whatever you have connected.
 
 ### Plugin Enable/Disable
 
-In `openclaw.json`:
+In `openclaw.json` (plugin IDs are **unscoped** — no `@clawdi-ai/` prefix):
 
 ```json
 {
   "plugins": {
-    "@clawdi-ai/knowledge-work-router": { "enabled": true },
-    "@clawdi-ai/pack-sales": { "enabled": true },
-    "@clawdi-ai/pack-recruiting": { "enabled": false }
+    "knowledge-work-router": { "enabled": true },
+    "pack-sales": { "enabled": true },
+    "pack-recruiting": { "enabled": false }
   }
 }
 ```
@@ -84,7 +95,7 @@ In `openclaw.json`:
 ```json
 {
   "plugins": {
-    "@clawdi-ai/knowledge-work-router": {
+    "knowledge-work-router": {
       "enabled": true,
       "config": {
         "adapterOrder": ["composio", "openclaw_tool", "lobster", "cli", "mcporter"],
@@ -140,6 +151,8 @@ Pack Skill → capability_execute tool
 
 The **DiscoveryEngine** probes each adapter asking "can you handle this capability?" Adapters search their runtime (Composio's search API, MCP server tool lists, built-in tool names, Lobster workflow registry, PATH binaries) and return a probe result or null.
 
+The router also supports **filesystem-based pack discovery** — if the plugin API registry is unavailable, it scans `/data/openclaw/extensions/pack-*` for pack directories.
+
 ## Creating a Pack
 
 1. Create directory: `packages/pack-yourpack/`
@@ -162,11 +175,11 @@ onboarding:
 ```
 
 3. Add skills in `skills/your-skill/SKILL.md`
-4. Add `openclaw.plugin.json`:
+4. Add `openclaw.plugin.json` (use **unscoped** ID):
 
 ```json
 {
-  "id": "@clawdi-ai/pack-yourpack",
+  "id": "pack-yourpack",
   "name": "Your Pack",
   "description": "Description of your pack",
   "version": "0.1.0",
@@ -174,8 +187,32 @@ onboarding:
 }
 ```
 
-5. Add `src/index.ts` to register slash commands
-6. Enable in `openclaw.json`
+5. Add `src/index.ts` to register slash commands. Command handlers return `{ text: "..." }`:
+
+```ts
+export function register(api: any) {
+  api.registerCommand({
+    name: "your_command",
+    description: "Does something useful",
+    handler: async () => {
+      return { text: "Command output here" };
+    },
+  });
+}
+```
+
+6. Add `tsconfig.json`:
+
+```json
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "outDir": "dist", "rootDir": "src" },
+  "include": ["src"],
+  "exclude": ["src/__tests__"]
+}
+```
+
+7. Copy to `/data/openclaw/extensions/pack-yourpack` and enable in `openclaw.json`
 
 ## Pack Manifest Reference
 
@@ -185,8 +222,8 @@ All fields for `pack-manifest.yaml`:
 |-------|------|----------|-------------|
 | `packId` | string | yes | Unique pack identifier |
 | `displayName` | string | yes | Human-readable name |
-| `capabilities.required` | string[] | yes | Capabilities the pack needs to function |
-| `capabilities.optional` | string[] | yes | Capabilities that enhance the pack |
+| `capabilities.required` | string[] | yes | Capabilities the pack needs to function (keep minimal — only free/universally available) |
+| `capabilities.optional` | string[] | yes | Capabilities that enhance the pack (paid integrations go here) |
 | `preferredApps` | Record\<pattern, string[]\> | no | Preferred app/toolkit per capability pattern |
 | `fallbackOverrides` | Record\<pattern, {adapters}\> | no | Override adapter order for specific capabilities |
 | `preferences` | Record\<string, PackPreference\> | no | User-configurable preferences captured at first use or onboarding |
@@ -221,21 +258,50 @@ To add a new adapter:
 
 The `probe()` method should be fast (no side-effects, <5s). Return `connectionReady: false` with a `setupHint` if the service needs configuration.
 
+## Deployment
+
+### Remote OpenClaw Instance
+
+```bash
+# On the remote machine
+git clone <repo-url> /tmp/clawdi-plugins
+cd /tmp/clawdi-plugins
+pnpm install
+pnpm build
+
+# Copy built packages to extensions directory
+cp -r packages/router /data/openclaw/extensions/knowledge-work-router
+cp -r packages/pack-sales /data/openclaw/extensions/pack-sales
+# ... repeat for desired packs
+
+# Restart OpenClaw to load extensions
+```
+
+### Plugin ID Convention
+
+OpenClaw uses **unscoped** plugin IDs. The directory name under `/data/openclaw/extensions/` should match the `id` field in `openclaw.plugin.json`:
+
+```
+/data/openclaw/extensions/
+  knowledge-work-router/    → id: "knowledge-work-router"
+  pack-sales/               → id: "pack-sales"
+  pack-marketing/           → id: "pack-marketing"
+```
+
 ## Development
 
 ```bash
 pnpm install          # Install dependencies
 pnpm build            # Build all packages
 pnpm test             # Run all tests
-pnpm --filter @clawdi-ai/knowledge-work-router test  # Router tests only
 ```
 
 Monorepo layout:
 
     packages/
-      router/           # Knowledge work router plugin
-      pack-sales/       # Sales pack
-      pack-productivity/ # Productivity pack
+      router/           # Knowledge work router plugin (id: knowledge-work-router)
+      pack-sales/       # Sales pack (id: pack-sales)
+      pack-productivity/ # Productivity pack (id: pack-productivity)
       ...               # 8 more packs
     docs/
       superpowers/      # Specs and plans
