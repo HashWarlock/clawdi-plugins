@@ -1,53 +1,86 @@
 import { describe, it, expect, vi } from "vitest";
 import { LobsterAdapter } from "../adapters/lobster.js";
-import { CliAdapter } from "../adapters/cli.js";
-import { McporterAdapter } from "../adapters/mcporter.js";
+
+const WORKFLOWS = [
+  "create-note-with-approval",
+  "brief-from-research",
+  "offer-approval-chain",
+];
 
 describe("LobsterAdapter", () => {
-  it("has id 'lobster'", () => {
-    expect(new LobsterAdapter().id).toBe("lobster");
-  });
+  function makeAdapter(workflows = WORKFLOWS) {
+    return new LobsterAdapter(
+      vi.fn().mockResolvedValue(workflows),
+      vi.fn().mockResolvedValue({ result: "done" })
+    );
+  }
 
-  it("provides workflow capabilities", async () => {
-    const caps = await new LobsterAdapter().providesCapabilities();
-    expect(caps.length).toBeGreaterThan(0);
-  });
-
-  it("reports not ready without lobster client", async () => {
-    const readiness = await new LobsterAdapter().checkReadiness({
-      packId: "sales",
-      capabilityId: "crm.create_note_workflow",
+  describe("probe", () => {
+    it("matches capabilities ending in _workflow", async () => {
+      const adapter = makeAdapter();
+      const result = await adapter.probe(
+        "crm.create_note_workflow",
+        "create note workflow"
+      );
+      expect(result).not.toBeNull();
+      expect(result!.providerDetails).toEqual({
+        workflowId: "create-note-with-approval",
+      });
     });
-    expect(readiness.ready).toBe(false);
-  });
-});
 
-describe("CliAdapter", () => {
-  it("has id 'cli'", () => {
-    expect(new CliAdapter().id).toBe("cli");
-  });
-
-  it("reports not ready when binary is missing", async () => {
-    const adapter = new CliAdapter();
-    const readiness = await adapter.checkReadiness({
-      packId: "sales",
-      capabilityId: "docs.convert_format",
+    it("returns null for capabilities without _workflow suffix", async () => {
+      const adapter = makeAdapter();
+      const result = await adapter.probe(
+        "crm.create_note",
+        "create note"
+      );
+      expect(result).toBeNull();
     });
-    // pandoc may or may not be installed, but adapter should not throw
-    expect(readiness).toHaveProperty("ready");
-  });
-});
 
-describe("McporterAdapter", () => {
-  it("has id 'mcporter'", () => {
-    expect(new McporterAdapter().id).toBe("mcporter");
-  });
-
-  it("reports not ready without mcporter client", async () => {
-    const readiness = await new McporterAdapter().checkReadiness({
-      packId: "sales",
-      capabilityId: "seo.audit_page",
+    it("skips _workflow check when pinned and matches by name", async () => {
+      const adapter = makeAdapter();
+      const result = await adapter.probe(
+        "crm.create_note",
+        "create note",
+        { pinned: true }
+      );
+      // "create_note" → search term "create-note" matches "create-note-with-approval"
+      expect(result).not.toBeNull();
+      expect(result!.providerDetails).toEqual({
+        workflowId: "create-note-with-approval",
+      });
     });
-    expect(readiness.ready).toBe(false);
+
+    it("returns null when no workflow matches", async () => {
+      const adapter = makeAdapter();
+      const result = await adapter.probe(
+        "unknown.do_thing_workflow",
+        "do thing workflow"
+      );
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("execute", () => {
+    it("runs the matched workflow", async () => {
+      const runWorkflow = vi
+        .fn()
+        .mockResolvedValue({ approved: true });
+      const adapter = new LobsterAdapter(
+        vi.fn().mockResolvedValue(WORKFLOWS),
+        runWorkflow
+      );
+      const result = await adapter.execute(
+        "crm.create_note_workflow",
+        { workflowId: "create-note-with-approval" },
+        { note: "test" },
+        "sales"
+      );
+      expect(result.status).toBe("ok");
+      expect(runWorkflow).toHaveBeenCalledWith(
+        "create-note-with-approval",
+        { note: "test" }
+      );
+    });
   });
 });
