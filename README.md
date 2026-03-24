@@ -6,25 +6,21 @@ The system consists of a **router plugin** that discovers available services in 
 
 ## Quick Start
 
-1. Clone and build:
+1. Clone and install:
 
 ```bash
 git clone <repo-url>
 cd clawdi-plugins
 pnpm install
-pnpm build
 ```
 
-2. Copy the built extensions into your OpenClaw extensions directory:
+2. Deploy to your OpenClaw extensions directory:
 
 ```bash
-# Copy router
-cp -r packages/router /data/openclaw/extensions/knowledge-work-router
-
-# Copy desired packs
-cp -r packages/pack-sales /data/openclaw/extensions/pack-sales
-cp -r packages/pack-productivity /data/openclaw/extensions/pack-productivity
+./scripts/deploy.sh /data/openclaw/extensions
 ```
+
+This builds all packages, copies them with correct plugin ID directory names, and installs runtime dependencies.
 
 3. Enable in your `openclaw.json`:
 
@@ -212,7 +208,7 @@ export function register(api: any) {
 }
 ```
 
-7. Copy to `/data/openclaw/extensions/pack-yourpack` and enable in `openclaw.json`
+7. Run `./scripts/deploy.sh` to deploy all plugins, or manually copy the built pack to `/data/openclaw/extensions/pack-yourpack` and run `npm install --omit=dev --ignore-scripts --legacy-peer-deps` if it has runtime dependencies. Enable in `openclaw.json`.
 
 ## Pack Manifest Reference
 
@@ -260,22 +256,26 @@ The `probe()` method should be fast (no side-effects, <5s). Return `connectionRe
 
 ## Deployment
 
-### Remote OpenClaw Instance
+### Deploy Script
+
+The `scripts/deploy.sh` script automates deployment following OpenClaw conventions:
 
 ```bash
 # On the remote machine
-git clone <repo-url> /tmp/clawdi-plugins
-cd /tmp/clawdi-plugins
+git clone <repo-url> /root/.openclaw/clawdi-plugins
+cd /root/.openclaw/clawdi-plugins
 pnpm install
-pnpm build
-
-# Copy built packages to extensions directory
-cp -r packages/router /data/openclaw/extensions/knowledge-work-router
-cp -r packages/pack-sales /data/openclaw/extensions/pack-sales
-# ... repeat for desired packs
-
-# Restart OpenClaw to load extensions
+./scripts/deploy.sh /data/openclaw/extensions
 ```
+
+The script:
+- Builds all packages
+- Reads each plugin's `id` from `openclaw.plugin.json`
+- Copies only deployment files (`dist/`, `package.json`, `openclaw.plugin.json`, `skills/`, `pack-manifest.yaml`)
+- Installs runtime dependencies per-plugin (`npm install --omit=dev --ignore-scripts --legacy-peer-deps`)
+- Safe to re-run — replaces each plugin directory on every run
+
+To deploy a subset of packs, copy only the desired pack directories manually after building, or modify `plugins.allow` in `openclaw.json` to control which plugins load.
 
 ### Plugin ID Convention
 
