@@ -11,6 +11,7 @@ import {
   runCheckSetup,
   formatCheckSetup,
 } from "./onboarding/check-setup.js";
+import type { SideEffectPolicy } from "./policy/side-effects.js";
 
 // Use permissive type — the plugin API shape varies across OpenClaw versions
 type PluginApi = any;
@@ -19,7 +20,7 @@ const DEFAULT_CONFIG = {
   adapterOrder: ["composio", "openclaw_tool", "lobster", "cli", "mcporter"],
   disabledAdapters: [] as string[],
   capabilityPins: {} as Record<string, string>,
-  sideEffectPolicy: "confirm_destructive",
+  sideEffectPolicy: "confirm_destructive" as SideEffectPolicy,
   cacheTtl: 600000,
   cliMappings: {} as Record<string, string>,
 };
