@@ -101,7 +101,7 @@ export async function resolve(
   const chosen = ready[0];
 
   // 5. Side-effect check
-  if (cap.sideEffect === "write" || cap.sideEffect === "destructive") {
+  {
     const shouldBlock =
       sideEffectPolicy === "always_confirm" ||
       (sideEffectPolicy === "confirm_destructive" &&
