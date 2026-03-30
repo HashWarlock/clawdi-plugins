@@ -1,0 +1,55 @@
+packId: operations
+version: "1"
+
+capabilities:
+  - id: project.list_tasks
+    required: true
+    sideEffect: read
+  - id: project.create_task
+    required: true
+    sideEffect: write
+  - id: docs.create_brief
+    required: true
+    sideEffect: write
+  - id: docs.search_files
+    required: true
+    sideEffect: read
+  - id: research.web_search
+    required: true
+    sideEffect: read
+  - id: calendar.read_events
+    required: false
+    sideEffect: read
+  - id: chat.search_messages
+    required: false
+    sideEffect: read
+  - id: mail.send_followup
+    required: false
+    sideEffect: write
+
+preferredProviders:
+  project.list_tasks:
+    - jira
+    - asana
+    - linear
+  project.create_task:
+    - jira
+    - asana
+    - linear
+  docs.create_brief:
+    - google_workspace
+    - notion
+    - confluence
+  docs.search_files:
+    - google_workspace
+    - notion
+    - confluence
+  calendar.read_events:
+    - google_workspace
+    - outlook
+  chat.search_messages:
+    - slack
+    - msteams
+  mail.send_followup:
+    - google_workspace
+    - outlook

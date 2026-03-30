@@ -1,0 +1,51 @@
+packId: marketing
+version: "1"
+
+capabilities:
+  - id: research.web_search
+    required: true
+    sideEffect: read
+  - id: docs.create_brief
+    required: true
+    sideEffect: write
+  - id: analytics.get_metrics
+    required: false
+    sideEffect: read
+  - id: seo.audit_page
+    required: false
+    sideEffect: read
+  - id: seo.keyword_research
+    required: false
+    sideEffect: read
+  - id: mail.send_followup
+    required: false
+    sideEffect: write
+  - id: chat.search_messages
+    required: false
+    sideEffect: read
+  - id: enrichment.lookup_company
+    required: false
+    sideEffect: read
+
+preferredProviders:
+  research.web_search:
+    - google_workspace
+    - bing
+  analytics.get_metrics:
+    - googlesuper
+    - google_analytics
+  seo.audit_page:
+    - googlesearchconsole
+    - googlesuper
+  seo.keyword_research:
+    - googlesearchconsole
+    - googlesuper
+  docs.create_brief:
+    - google_workspace
+    - notion
+  mail.send_followup:
+    - google_workspace
+    - outlook
+  chat.search_messages:
+    - slack
+    - msteams

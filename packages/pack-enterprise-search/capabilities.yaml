@@ -1,0 +1,36 @@
+packId: enterprise-search
+version: "1"
+
+capabilities:
+  - id: research.web_search
+    required: true
+    sideEffect: read
+  - id: docs.search_files
+    required: true
+    sideEffect: read
+  - id: mail.read_inbox
+    required: true
+    sideEffect: read
+  - id: chat.search_messages
+    required: false
+    sideEffect: read
+  - id: docs.create_brief
+    required: false
+    sideEffect: write
+
+preferredProviders:
+  research.*:
+    - perplexity
+    - tavily
+    - brave_search
+  docs.*:
+    - notion
+    - google_workspace
+    - confluence
+    - sharepoint
+  mail.*:
+    - google_workspace
+    - outlook
+  chat.*:
+    - slack
+    - teams

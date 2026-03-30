@@ -1,0 +1,34 @@
+packId: productivity
+version: "1"
+
+capabilities:
+  - id: calendar.read_events
+    required: true
+    sideEffect: read
+  - id: mail.read_inbox
+    required: true
+    sideEffect: read
+  - id: project.list_tasks
+    required: true
+    sideEffect: read
+  - id: chat.search_messages
+    required: false
+    sideEffect: read
+  - id: docs.search_files
+    required: false
+    sideEffect: read
+  - id: project.create_task
+    required: false
+    sideEffect: write
+  - id: research.web_search
+    required: false
+    sideEffect: read
+
+preferredProviders:
+  calendar.*:
+    - google_workspace
+    - outlook
+  project.*:
+    - linear
+    - asana
+    - jira
