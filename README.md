@@ -61,12 +61,13 @@ Run `/connect_apps` to see what services are available in your environment:
 /connect_apps
 ```
 
-The router dynamically discovers services from:
-- **Composio** — SaaS integrations (Google Workspace, HubSpot, Slack, etc.)
+The router discovers providers at startup via six scanners:
 - **Built-in OpenClaw tools** — Native tools (web_search, read_file, etc.)
-- **Lobster workflows** — Multi-step orchestrated flows
-- **CLI tools** — Local binaries (pandoc, jq, etc.)
+- **Composio** — SaaS integrations (Google Workspace, HubSpot, Slack, etc.)
 - **MCP servers** — Any configured MCP server tools
+- **CLI tools** — Local binaries (pandoc, jq, etc.)
+- **Lobster workflows** — Multi-step orchestrated flows
+- **Skills** — Pack skills that declare `metadata.router.provides.capabilities` in SKILL.md frontmatter
 
 No hardcoded service list — the router adapts to whatever you have connected.
 
@@ -94,13 +95,7 @@ In `openclaw.json` (plugin IDs are **unscoped** — no `@clawdi-ai/` prefix):
     "knowledge-work-router": {
       "enabled": true,
       "config": {
-        "adapterOrder": ["composio", "openclaw_tool", "lobster", "cli", "mcporter"],
-        "disabledAdapters": [],
         "sideEffectPolicy": "confirm_destructive",
-        "cacheTtl": 600000,
-        "capabilityPins": {
-          "seo.*": "mcporter"
-        },
         "cliMappings": {
           "docs.convert_*": "pandoc",
           "data.query_*": "jq"
@@ -113,11 +108,7 @@ In `openclaw.json` (plugin IDs are **unscoped** — no `@clawdi-ai/` prefix):
 
 | Field | Description | Default |
 |-------|-------------|---------|
-| `adapterOrder` | Fallback order for adapter probing | All 5 in order |
-| `disabledAdapters` | Adapters to skip entirely | `[]` |
 | `sideEffectPolicy` | `always_confirm`, `confirm_destructive`, `never_confirm` | `confirm_destructive` |
-| `cacheTtl` | Discovery cache TTL in ms | `600000` (10 min) |
-| `capabilityPins` | Pin capabilities to specific adapters | `{}` |
 | `cliMappings` | Map capability patterns to CLI binaries | `{}` |
 
 ## Checking Status
@@ -126,52 +117,75 @@ In `openclaw.json` (plugin IDs are **unscoped** — no `@clawdi-ai/` prefix):
 /check_setup
 ```
 
-Shows the status of all capabilities across all installed packs, which adapter resolves each one, and which adapters are enabled.
+Shows the status of all capabilities across all installed packs, which provider resolves each one, and which scanner sources are active.
 
 ---
 
 ## Architecture
 
 ```
-Pack Skill → capability_execute tool
-                    ↓
-               Router.resolve()
-                    ↓
-          DiscoveryEngine.resolve()
-                    ↓
-      Probe adapters in fallback order:
-        Composio → OpenClaw Tool → Lobster → CLI → MCPorter
-                    ↓
-           Cache result, execute via adapter
+Startup (gateway_start):
+  For each pack:
+    Load capabilities.yaml (pack contract)
+    Load pack-manifest.yaml (onboarding metadata)
+    Run 6 scanners in parallel → ProviderEntry[]
+    Populate registry: Map<CapabilityId, ProviderEntry[]>
+
+Runtime (capability_execute tool call):
+  Pack Skill → capability_execute { packId, capabilityId, args }
+                      ↓
+                 resolve()
+                      ↓
+         Registry lookup → sort by preferredProviders
+                      ↓
+         Side-effect check (from contract, not verb parsing)
+                      ↓
+         executeTarget() — exhaustive switch on ProviderTarget.kind
 ```
 
-The **DiscoveryEngine** probes each adapter asking "can you handle this capability?" Adapters search their runtime (Composio's search API, MCP server tool lists, built-in tool names, Lobster workflow registry, PATH binaries) and return a probe result or null.
+At startup, the router loads each pack's `capabilities.yaml` contract and runs all six scanners in parallel to discover available providers. Results are stored in a registry map. At runtime, `resolve()` does a map lookup, sorts by the pack's `preferredProviders`, checks the capability's declared `sideEffect`, and dispatches to the chosen provider.
 
 The router also supports **filesystem-based pack discovery** — if the plugin API registry is unavailable, it scans `/data/openclaw/extensions/pack-*` for pack directories.
 
 ## Creating a Pack
 
 1. Create directory: `packages/pack-yourpack/`
-2. Add `pack-manifest.yaml`:
+2. Add `capabilities.yaml` (the router contract):
+
+```yaml
+packId: yourpack
+version: "1"
+
+capabilities:
+  - id: calendar.read_events
+    required: true
+    sideEffect: read
+  - id: docs.create_brief
+    required: false
+    sideEffect: write
+
+preferredProviders:
+  calendar.*:
+    - google_workspace
+```
+
+Side-effect classification:
+- `read` — lookup, search, list, get, audit operations
+- `write` — create, send, update operations
+- `destructive` — delete, revoke, destroy operations
+
+3. Add `pack-manifest.yaml` (onboarding metadata):
 
 ```yaml
 packId: yourpack
 displayName: "Your Pack"
-capabilities:
-  required:
-    - calendar.read_events
-  optional:
-    - docs.create_brief
-preferredApps:
-  calendar.*:
-    - google_workspace
 onboarding:
   welcomeMessage: "Your pack is ready."
   suggestedFirstTask: "Try: 'do something cool'"
 ```
 
-3. Add skills in `skills/your-skill/SKILL.md`
-4. Add `openclaw.plugin.json` (use **unscoped** ID):
+4. Add skills in `skills/your-skill/SKILL.md`
+5. Add `openclaw.plugin.json` (use **unscoped** ID):
 
 ```json
 {
@@ -183,7 +197,7 @@ onboarding:
 }
 ```
 
-5. Add `src/index.ts` to register slash commands. Command handlers return `{ text: "..." }`:
+6. Add `src/index.ts` to register slash commands. Command handlers return `{ text: "..." }`:
 
 ```ts
 export function register(api: any) {
@@ -197,7 +211,7 @@ export function register(api: any) {
 }
 ```
 
-6. Add `tsconfig.json`:
+7. Add `tsconfig.json`:
 
 ```json
 {
@@ -208,51 +222,61 @@ export function register(api: any) {
 }
 ```
 
-7. Run `./scripts/deploy.sh` to deploy all plugins, or manually copy the built pack to `/data/openclaw/extensions/pack-yourpack` and run `npm install --omit=dev --ignore-scripts --legacy-peer-deps` if it has runtime dependencies. Enable in `openclaw.json`.
+8. Run `./scripts/deploy.sh` to deploy all plugins, or manually copy the built pack to `/data/openclaw/extensions/pack-yourpack` and run `npm install --omit=dev --ignore-scripts --legacy-peer-deps` if it has runtime dependencies. Enable in `openclaw.json`.
 
-## Pack Manifest Reference
+## Pack Contract Reference
 
-All fields for `pack-manifest.yaml`:
+### `capabilities.yaml` (router contract)
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `packId` | string | yes | Unique pack identifier (must match `pack-manifest.yaml`) |
+| `version` | string | yes | Contract version (currently `"1"`) |
+| `capabilities` | array | yes | Non-empty list of capability declarations |
+| `capabilities[].id` | string | yes | Capability ID (e.g. `calendar.read_events`) |
+| `capabilities[].required` | boolean | yes | Whether the pack needs this to function |
+| `capabilities[].sideEffect` | string | yes | `read`, `write`, or `destructive` |
+| `preferredProviders` | Record\<pattern, string[]\> | no | Preferred provider per capability pattern (e.g. `crm.*: [salesforce, hubspot]`) |
+
+### `pack-manifest.yaml` (onboarding metadata)
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `packId` | string | yes | Unique pack identifier |
 | `displayName` | string | yes | Human-readable name |
-| `capabilities.required` | string[] | yes | Capabilities the pack needs to function (keep minimal — only free/universally available) |
-| `capabilities.optional` | string[] | yes | Capabilities that enhance the pack (paid integrations go here) |
-| `preferredApps` | Record\<pattern, string[]\> | no | Preferred app/toolkit per capability pattern |
-| `fallbackOverrides` | Record\<pattern, {adapters}\> | no | Override adapter order for specific capabilities |
 | `preferences` | Record\<string, PackPreference\> | no | User-configurable preferences captured at first use or onboarding |
-| `sideEffects` | string[] | no | Capabilities that should always be treated as side-effects |
 | `onboarding.welcomeMessage` | string | yes | Shown when pack is first activated |
 | `onboarding.suggestedFirstTask` | string | yes | Suggested prompt to try |
 
+The router reads `capabilities.yaml` for resolution logic and `pack-manifest.yaml` for display names and onboarding. Both files are required.
+
 ## How Discovery Works
 
-Each adapter implements `probe()` and `execute()`:
+Six scanner functions run at startup, each returning `ProviderEntry[]`:
 
-- **Composio**: Calls `COMPOSIO_SEARCH_TOOLS` with the capability's intent string. Returns the best matching toolkit and action.
-- **OpenClaw Tool**: Matches the capability's `verb_noun` against built-in tool names. Exact match only.
-- **Lobster**: Matches capabilities with `_workflow` suffix against registered Lobster workflows.
-- **CLI**: Checks `cliMappings` config for pattern match, then verifies binary exists via `which`.
-- **MCPorter**: Scans all configured MCP server tool lists for keyword matches.
+- **`scanBuiltins`**: Strips the domain prefix from each capability ID (e.g. `research.web_search` → `web_search`) and matches against `listBuiltinTools()`.
+- **`scanComposio`**: Calls `COMPOSIO_SEARCH_TOOLS` via the `clawdi-mcp` server with the capability's intent string. Honors `preferredProviders` when multiple toolkits match. Checks connection status via `toolkit_connection_statuses` and fetches OAuth setup URLs for unconnected toolkits.
+- **`scanMcpServers`**: Lists all configured MCP servers and their tools. Matches capability intent keywords against tool names and descriptions.
+- **`scanCliMappings`**: Pattern-matches capabilities against the `cliMappings` config, then verifies the binary exists via `which`.
+- **`scanLobster`**: Only matches capabilities ending in `_workflow`. Converts underscore-separated names to hyphen-case and searches registered Lobster workflow IDs.
+- **`scanSkills`**: Reads `SKILL.md` frontmatter in pack skill directories. Skills that declare `metadata.router.provides.capabilities` are registered as providers. Checks binary and environment variable requirements before marking as ready.
 
-Results are cached for 10 minutes (configurable). Cache is invalidated on execution failure.
+All scanners run in parallel via `Promise.all`. Results are stored in the registry for the lifetime of the process.
 
-## Adding an Adapter
+## Adding a Scanner
 
-To add a new adapter:
+To add a new provider source:
 
-1. Create `src/adapters/your-adapter.ts` implementing `CapabilityAdapter`:
+1. Add a scanner function in `src/scanners.ts`:
 
-    - `probe(capabilityId, intent, hints?)` — return a `ProbeResult` if you can handle this capability, or `null`
-    - `execute(capabilityId, providerDetails, args, packId)` — run the capability using the details from your probe result
+    - Takes `capabilities: PackCapability[]` and any source-specific args
+    - Returns `ProviderEntry[]` with the appropriate `source` and `target.kind`
+    - Wraps external calls in try/catch, returning `[]` on failure
 
-2. Register it in `src/index.ts` — add to the `adapters` array
-3. Add its ID to the `adapterOrder` enum in `openclaw.plugin.json`
-4. Write tests in `src/__tests__/your-adapter.test.ts`
-
-The `probe()` method should be fast (no side-effects, <5s). Return `connectionReady: false` with a `setupHint` if the service needs configuration.
+2. Add the new `target.kind` to the `ProviderTarget` union in `src/types.ts`
+3. Add a case to the `executeTarget` switch in `src/resolve.ts`
+4. Add the scanner call to `runAllScanners` in `src/scanners.ts`
+5. Write tests in `src/__tests__/scanners.test.ts`
 
 ## Deployment
 
@@ -271,7 +295,7 @@ pnpm install
 The script:
 - Builds all packages
 - Reads each plugin's `id` from `openclaw.plugin.json`
-- Copies only deployment files (`dist/`, `package.json`, `openclaw.plugin.json`, `skills/`, `pack-manifest.yaml`)
+- Copies only deployment files (`dist/`, `package.json`, `openclaw.plugin.json`, `skills/`, `pack-manifest.yaml`, `capabilities.yaml`)
 - Installs runtime dependencies per-plugin (`npm install --omit=dev --ignore-scripts --legacy-peer-deps`)
 - Safe to re-run — replaces each plugin directory on every run
 
