@@ -57,6 +57,7 @@ for pkg_dir in "$REPO_ROOT"/packages/*/; do
   # Copy optional pack files
   [ -d "$pkg_dir/skills" ] && cp -r "$pkg_dir/skills" "$dest/skills"
   [ -f "$pkg_dir/pack-manifest.yaml" ] && cp "$pkg_dir/pack-manifest.yaml" "$dest/pack-manifest.yaml"
+  [ -f "$pkg_dir/capabilities.yaml" ] && cp "$pkg_dir/capabilities.yaml" "$dest/capabilities.yaml"
 
   # Install runtime dependencies if package.json has any
   has_deps=$(node -e "
