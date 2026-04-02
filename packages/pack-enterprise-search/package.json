@@ -1,6 +1,7 @@
 {
   "name": "@clawdi-ai/pack-enterprise-search",
   "version": "0.1.0",
+  "type": "module",
   "description": "Enterprise search workflows: multi-source search, strategy planning, knowledge synthesis, and daily digests",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

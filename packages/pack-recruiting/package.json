@@ -1,6 +1,7 @@
 {
   "name": "@clawdi-ai/pack-recruiting",
   "version": "0.1.0",
+  "type": "module",
   "description": "Recruiting knowledge-work pack: pipeline management, interview prep, org planning, and offers",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

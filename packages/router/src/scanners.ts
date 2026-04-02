@@ -1,8 +1,8 @@
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { readdirSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 import type { PackCapability, ProviderEntry, RuntimeCallbacks } from "./types.js";
 
@@ -268,8 +268,6 @@ export function scanSkills(
 
       let content: string;
       try {
-        // Synchronous read is acceptable during enrollment
-        const { readFileSync } = require("node:fs");
         content = readFileSync(skillPath, "utf-8");
       } catch {
         continue;
@@ -294,7 +292,7 @@ export function scanSkills(
       const reqEnv: string[] = fm?.metadata?.openclaw?.requires?.env ?? [];
       const binsOk = reqBins.every((bin: string) => {
         try {
-          require("node:child_process").execFileSync("which", [bin], { stdio: "ignore" });
+          execFileSync("which", [bin], { stdio: "ignore" });
           return true;
         } catch {
           return false;

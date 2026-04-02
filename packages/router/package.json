@@ -1,6 +1,7 @@
 {
   "name": "@clawdi-ai/knowledge-work-router",
   "version": "0.1.0",
+  "type": "module",
   "description": "Capability router for OpenClaw knowledge-work packs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
