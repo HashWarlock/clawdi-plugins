@@ -1,0 +1,59 @@
+packId: product-management
+version: "1"
+
+capabilities:
+  - id: project.list_tasks
+    required: true
+    sideEffect: read
+  - id: project.create_task
+    required: true
+    sideEffect: write
+  - id: docs.search_files
+    required: true
+    sideEffect: read
+  - id: docs.create_brief
+    required: true
+    sideEffect: write
+  - id: research.web_search
+    required: false
+    sideEffect: read
+  - id: analytics.get_metrics
+    required: false
+    sideEffect: read
+  - id: chat.search_messages
+    required: false
+    sideEffect: read
+  - id: calendar.read_events
+    required: false
+    sideEffect: read
+  - id: mail.read_inbox
+    required: false
+    sideEffect: read
+
+preferredProviders:
+  project.*:
+    - linear
+    - jira
+    - asana
+    - shortcut
+  docs.*:
+    - notion
+    - google_workspace
+    - confluence
+  research.*:
+    - perplexity
+    - tavily
+    - brave_search
+  analytics.*:
+    - amplitude
+    - mixpanel
+    - posthog
+  chat.*:
+    - slack
+    - teams
+  calendar.*:
+    - google_workspace
+    - outlook
+  mail.*:
+    - google_workspace
+    - outlook

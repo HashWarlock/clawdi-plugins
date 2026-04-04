@@ -1,0 +1,37 @@
+packId: recruiting
+version: "1"
+
+capabilities:
+  - id: ats.search_candidates
+    required: true
+    sideEffect: read
+  - id: ats.get_candidate
+    required: true
+    sideEffect: read
+  - id: calendar.read_events
+    required: true
+    sideEffect: read
+  - id: research.web_search
+    required: true
+    sideEffect: read
+  - id: ats.update_candidate_stage
+    required: false
+    sideEffect: write
+  - id: mail.send_followup
+    required: false
+    sideEffect: write
+  - id: mail.read_inbox
+    required: false
+    sideEffect: read
+  - id: docs.create_brief
+    required: false
+    sideEffect: write
+  - id: recruiting.offer_workflow
+    required: false
+    sideEffect: write
+
+preferredProviders:
+  ats.*:
+    - greenhouse
+    - lever
+    - ashby

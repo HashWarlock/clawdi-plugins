@@ -1,27 +1,25 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { Router } from "./router.js";
-import { ComposioAdapter } from "./adapters/composio.js";
-import { OpenClawToolAdapter } from "./adapters/openclaw-tool.js";
-import { LobsterAdapter } from "./adapters/lobster.js";
-import { CliAdapter } from "./adapters/cli.js";
-import { McporterAdapter } from "./adapters/mcporter.js";
-import { runConnectApps } from "./onboarding/connect-apps.js";
-import {
-  runCheckSetup,
-  formatCheckSetup,
-} from "./onboarding/check-setup.js";
-import type { SideEffectPolicy } from "./policy/side-effects.js";
+import { readFile } from "node:fs/promises";
+import { parse as parseYaml } from "yaml";
+import { loadContract } from "./contract.js";
+import { createRegistry, populate } from "./registry.js";
+import { runAllScanners } from "./scanners.js";
+import { resolve } from "./resolve.js";
+import { buildCheckSetup, formatCheckSetup, formatConnectApps } from "./check-setup.js";
+import type {
+  PackContract,
+  PackManifest,
+  RuntimeCallbacks,
+  SideEffectPolicy,
+} from "./types.js";
+import type { Registry } from "./registry.js";
 
 // Use permissive type — the plugin API shape varies across OpenClaw versions
 type PluginApi = any;
 
 const DEFAULT_CONFIG = {
-  adapterOrder: ["composio", "openclaw_tool", "lobster", "cli", "mcporter"],
-  disabledAdapters: [] as string[],
-  capabilityPins: {} as Record<string, string>,
   sideEffectPolicy: "confirm_destructive" as SideEffectPolicy,
-  cacheTtl: 600000,
   cliMappings: {} as Record<string, string>,
 };
 
@@ -32,10 +30,6 @@ function resolveConfig(api: PluginApi) {
   } as typeof DEFAULT_CONFIG;
 }
 
-/**
- * Discover pack install paths. First tries the plugin API registry,
- * then falls back to scanning /data/openclaw/extensions/pack-*.
- */
 function discoverPackInstallPaths(api: PluginApi): string[] {
   const pathsFromApi =
     api
@@ -48,7 +42,6 @@ function discoverPackInstallPaths(api: PluginApi): string[] {
 
   if (pathsFromApi.length) return pathsFromApi;
 
-  // Filesystem fallback for environments without plugin registry
   const root = "/data/openclaw/extensions";
   if (!existsSync(root)) return [];
 
@@ -57,59 +50,65 @@ function discoverPackInstallPaths(api: PluginApi): string[] {
     .map((d) => join(root, d.name));
 }
 
+function buildCallbacks(api: PluginApi): RuntimeCallbacks {
+  return {
+    callBuiltinTool: (name, args) =>
+      api?.runtime?.callBuiltinTool?.(name, args) ?? Promise.resolve(null),
+    callMcpTool: (server, tool, args) =>
+      api?.runtime?.callMcpTool?.(server, tool, args) ?? Promise.resolve(null),
+    listBuiltinTools: () => api?.runtime?.listBuiltinTools?.() ?? [],
+    listMcpServers: () =>
+      api?.runtime?.listMcpServers?.() ?? Promise.resolve([]),
+    listLobsterWorkflows: () =>
+      api?.runtime?.listLobsterWorkflows?.() ?? Promise.resolve([]),
+    runLobsterWorkflow: (id, args) =>
+      api?.runtime?.runLobsterWorkflow?.(id, args) ?? Promise.resolve(null),
+  };
+}
+
+async function loadManifest(installPath: string): Promise<PackManifest> {
+  const raw = await readFile(join(installPath, "pack-manifest.yaml"), "utf-8");
+  return parseYaml(raw) as PackManifest;
+}
+
 export function register(api: PluginApi) {
   const config = resolveConfig(api);
+  const callbacks = buildCallbacks(api);
 
-  // Create adapters with runtime callbacks (safe-access for optional runtime methods)
-  const composio = new ComposioAdapter((server, tool, args) =>
-    api?.runtime?.callMcpTool?.(server, tool, args) ?? Promise.resolve(null)
-  );
-  const openclawTool = new OpenClawToolAdapter(
-    () => api?.runtime?.listBuiltinTools?.() ?? [],
-    (name, args) =>
-      api?.runtime?.callBuiltinTool?.(name, args) ?? Promise.resolve(null)
-  );
-  const lobster = new LobsterAdapter(
-    () =>
-      api?.runtime?.listLobsterWorkflows?.() ?? Promise.resolve([]),
-    (id, args) =>
-      api?.runtime?.runLobsterWorkflow?.(id, args) ?? Promise.resolve(null)
-  );
-  const cli = new CliAdapter(config.cliMappings ?? {});
-  const mcporter = new McporterAdapter(
-    () =>
-      api?.runtime?.listMcpServers?.() ?? Promise.resolve([]),
-    (server, tool, args) =>
-      api?.runtime?.callMcpTool?.(server, tool, args) ?? Promise.resolve(null)
-  );
+  const registry: Registry = createRegistry();
+  const contracts = new Map<string, PackContract>();
+  const manifests = new Map<string, PackManifest>();
 
-  const adapters = [composio, openclawTool, lobster, cli, mcporter];
-
-  const router = new Router(adapters, {
-    adapterOrder: config.adapterOrder,
-    disabledAdapters: config.disabledAdapters,
-    capabilityPins: config.capabilityPins,
-    sideEffectPolicy: config.sideEffectPolicy,
-    cacheTtl: config.cacheTtl,
-  });
-
-  // Discover packs at startup
+  // Discover packs and populate registry at startup
   api.on("gateway_start", async () => {
     const packPaths = discoverPackInstallPaths(api);
+
     for (const installPath of packPaths) {
       try {
-        const manifest = await Router.loadPackManifest(installPath);
-        router.registerPack(manifest);
-      } catch (err) {
-        console.error(
-          `[knowledge-work-router] Failed to load pack from ${installPath}:`,
-          err
+        const contract = await loadContract(installPath);
+        const manifest = await loadManifest(installPath);
+        contracts.set(contract.packId, contract);
+        manifests.set(contract.packId, manifest);
+
+        // Collect skill directories for this pack
+        const skillDir = join(installPath, "skills");
+        const skillDirs = existsSync(skillDir) ? [skillDir] : [];
+
+        // Run all scanners for this pack's capabilities
+        const entries = await runAllScanners(
+          contract.capabilities,
+          callbacks,
+          config.cliMappings ?? {},
+          skillDirs,
+          contract.preferredProviders
         );
+        populate(registry, entries);
+      } catch (err) {
+        console.error(`[knowledge-work-router] Failed to load pack from ${installPath}:`, err);
       }
     }
-    console.log(
-      `[knowledge-work-router] Discovered ${router.packs.length} pack(s)`
-    );
+
+    console.log(`[knowledge-work-router] Discovered ${contracts.size} pack(s)`);
   });
 
   // Register capability_execute tool
@@ -139,66 +138,36 @@ export function register(api: PluginApi) {
       },
       required: ["capabilityId", "packId"],
     },
-    handler: async ({
-      capabilityId,
-      packId,
-      args,
-      confirmationToken,
-    }: any) => {
-      if (confirmationToken) {
-        return router.executeConfirmed(confirmationToken);
-      }
-      return router.resolve(capabilityId, packId, args ?? {});
+    handler: async ({ capabilityId, packId, args, confirmationToken }: any) => {
+      return resolve(
+        packId,
+        capabilityId,
+        args ?? {},
+        registry,
+        contracts,
+        callbacks,
+        config.sideEffectPolicy,
+        confirmationToken
+      );
     },
   });
 
   // Register /connect_apps command
   api.registerCommand({
     name: "connect_apps",
-    description:
-      "Set up connections for your installed knowledge-work packs",
+    description: "Set up connections for your installed knowledge-work packs",
     handler: async () => {
-      const report = await runConnectApps(
-        router.packs,
-        router.engine
-      );
-      const lines: string[] = [];
-      for (const pr of report.packReports) {
-        lines.push(`\n**${pr.displayName}**`);
-        if (pr.allRequiredReady) {
-          lines.push("All required capabilities are ready.");
-        } else {
-          if (pr.ready.length) {
-            lines.push(
-              `Ready: ${pr.ready.map((r: any) => `${r.capabilityId} -> ${r.displayName}`).join(", ")}`
-            );
-          }
-          for (const s of pr.needsSetup) {
-            lines.push(
-              `Needs setup: ${s.capabilityId} -> ${s.displayName}${s.setupUrl ? ` (${s.setupUrl})` : s.setupHint ? ` — ${s.setupHint}` : ""}`
-            );
-          }
-          if (pr.notFound.length) {
-            lines.push(`No provider: ${pr.notFound.join(", ")}`);
-          }
-        }
-      }
-      return { text: lines.join("\n") || "No packs discovered." };
+      const status = buildCheckSetup(contracts, manifests, registry);
+      return { text: formatConnectApps(status) };
     },
   });
 
   // Register /check_setup command
   api.registerCommand({
     name: "check_setup",
-    description:
-      "Show the status of all knowledge-work pack capabilities and adapters",
+    description: "Show the status of all knowledge-work pack capabilities",
     handler: async () => {
-      const status = await runCheckSetup(
-        router.packs,
-        router.engine,
-        adapters,
-        config.disabledAdapters ?? []
-      );
+      const status = buildCheckSetup(contracts, manifests, registry);
       return { text: formatCheckSetup(status) };
     },
   });

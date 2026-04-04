@@ -1,6 +1,7 @@
 {
   "name": "@clawdi-ai/pack-engineering",
   "version": "0.1.0",
+  "type": "module",
   "description": "Engineering workflows: code review prep, incident response, architecture review, sprint retro, tech debt tracking, and documentation generation",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

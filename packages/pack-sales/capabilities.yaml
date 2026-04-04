@@ -1,0 +1,48 @@
+packId: sales
+version: "1"
+
+capabilities:
+  - id: calendar.read_events
+    required: true
+    sideEffect: read
+  - id: calendar.prepare_meeting_context
+    required: true
+    sideEffect: read
+  - id: crm.lookup_account
+    required: true
+    sideEffect: read
+  - id: crm.create_note
+    required: true
+    sideEffect: write
+  - id: mail.send_followup
+    required: true
+    sideEffect: write
+  - id: research.web_search
+    required: true
+    sideEffect: read
+  - id: docs.create_brief
+    required: false
+    sideEffect: write
+  - id: research.collect_sources
+    required: false
+    sideEffect: read
+  - id: chat.search_messages
+    required: false
+    sideEffect: read
+  - id: enrichment.lookup_company
+    required: false
+    sideEffect: read
+  - id: enrichment.lookup_person
+    required: false
+    sideEffect: read
+
+preferredProviders:
+  calendar.*:
+    - google_workspace
+    - outlook
+  crm.*:
+    - salesforce
+    - hubspot
+  mail.*:
+    - google_workspace
+    - outlook

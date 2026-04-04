@@ -1,0 +1,50 @@
+packId: human-resources
+version: "1"
+
+capabilities:
+  - id: hris.get_employee
+    required: true
+    sideEffect: read
+  - id: hris.list_employees
+    required: true
+    sideEffect: read
+  - id: docs.search_files
+    required: true
+    sideEffect: read
+  - id: docs.create_brief
+    required: true
+    sideEffect: write
+  - id: compensation.get_benchmarks
+    required: false
+    sideEffect: read
+  - id: research.web_search
+    required: false
+    sideEffect: read
+  - id: project.list_tasks
+    required: false
+    sideEffect: read
+  - id: calendar.read_events
+    required: false
+    sideEffect: read
+  - id: mail.send_followup
+    required: false
+    sideEffect: write
+
+preferredProviders:
+  hris.*:
+    - bamboohr
+    - workday
+    - rippling
+  docs.*:
+    - google_workspace
+    - notion
+    - confluence
+  compensation.*:
+    - payscale
+    - levels_fyi
+  calendar.*:
+    - google_workspace
+    - outlook
+  mail.*:
+    - google_workspace
+    - outlook

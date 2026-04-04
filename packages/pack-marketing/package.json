@@ -1,6 +1,7 @@
 {
   "name": "@clawdi-ai/pack-marketing",
   "version": "0.1.0",
+  "type": "module",
   "description": "Marketing knowledge-work pack: brand review, campaign planning, content creation, SEO, email sequences, and performance reporting",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

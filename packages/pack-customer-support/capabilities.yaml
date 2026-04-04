@@ -1,0 +1,48 @@
+packId: customer-support
+version: "1"
+
+capabilities:
+  - id: mail.read_inbox
+    required: true
+    sideEffect: read
+  - id: crm.lookup_account
+    required: true
+    sideEffect: read
+  - id: project.create_task
+    required: true
+    sideEffect: write
+  - id: docs.search_files
+    required: true
+    sideEffect: read
+  - id: research.web_search
+    required: false
+    sideEffect: read
+  - id: mail.send_followup
+    required: false
+    sideEffect: write
+  - id: docs.create_brief
+    required: false
+    sideEffect: write
+  - id: chat.search_messages
+    required: false
+    sideEffect: read
+
+preferredProviders:
+  mail.*:
+    - google_workspace
+    - outlook
+  crm.*:
+    - zendesk
+    - salesforce
+    - hubspot
+  project.*:
+    - linear
+    - jira
+    - asana
+  docs.*:
+    - notion
+    - google_workspace
+    - confluence
+  chat.*:
+    - slack
+    - teams

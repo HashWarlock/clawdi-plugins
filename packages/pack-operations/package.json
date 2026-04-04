@@ -1,6 +1,7 @@
 {
   "name": "@clawdi-ai/pack-operations",
   "version": "0.1.0",
+  "type": "module",
   "description": "Operations knowledge-work pack: capacity planning, change management, compliance, process documentation, risk assessment, runbooks, and vendor reviews",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
